@@ -66,7 +66,7 @@ Only committed changes are included in a push. Push sends the branch to GitHub; 
 ## 6. Open a pull request
 
 1. In GitHub Desktop, click **Preview Pull Request** or open the repository on GitHub and choose **Pull requests → New pull request**.
-2. Set **base** to `main` and **compare** to the feature branch.
+2. Set **base** to `main` and **compare** to the feature branch. Note: both  **base** and **compare** should refer to **your forked repo**
 3. Use the PR template. Explain the goal, the implementation, local test commands/results, and anything the reviewer should focus on.
 4. Link the Issue with a closing keyword in the PR description, for example `Closes #12`. This will close the Issue only when the PR is merged into the repository's default branch.
 5. Create the PR. Keep it open while review and CI run.
@@ -116,7 +116,6 @@ Refresh the repository and check:
 - [ ] I checked local test evidence and Windows/Ubuntu CI.
 - [ ] My review comment names a specific line or behavior and explains why.
 - [ ] I responded to feedback and rechecked the updated diff.
-- [ ] I waited for instructor approval before merge.
 
 ## Common beginner questions
 
