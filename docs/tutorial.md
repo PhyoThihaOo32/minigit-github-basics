@@ -38,14 +38,37 @@ The starter CMake file already builds `src/PathLab.cpp` and `tests/PathLabTests.
 
 ## 4. Configure, build, and test locally
 
-Open **Terminal → New Terminal** in VS Code at the repository root. Run:
+(1) Open **Terminal → New Terminal** in VS Code at the repository root. Run:
 
-```powershell
+-----------------------------------------------------------------------------------------------------------------
+VS Code on Windows
+```
+g++ -std=c++17 -Wall -Wextra -pedantic -Iinclude src/PathLab.cpp tests/PathLabTests.cpp -o path_lab_tests.exe
+```
+
+VS Code on Mac OS
+```
+clang++ -std=c++17 -Wall -Wextra -pedantic -Iinclude src/PathLab.cpp tests/PathLabTests.cpp -o path_lab_tests.exe
+./path_lab_tests.exe
+```
+-----------------------------------------------------------------------------------------------------------------
+or 
+(2) **use CMake**
+
+Install CMake on Windows, run the following command in the terminal (PowerShell) in VS Code, then restart VS Code
+```
+winget install Kitware.CMake
+```
+Install CMake in Mac OS; run the following command in the terminal in VS Code 
+```
+brew install cmake
+```
+Then run the following command in the terminal in VS Code
+```
 cmake -S . -B build
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
-
 - Configure reads `CMakeLists.txt` and prepares a build directory.
 - Build compiles the library and test program.
 - CTest runs the tests registered by CMake.
