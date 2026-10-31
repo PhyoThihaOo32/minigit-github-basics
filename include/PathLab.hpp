@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <string>
 
 namespace minigit
 {
@@ -10,5 +11,11 @@ namespace minigit
 
     // Return the HEAD file path without creating files or directories.
     std::filesystem::path headPath(const std::filesystem::path &root);
+
+    // Write text to the caller's path, creating missing parent directories.
+    // Replace existing file contents. Return false if directory creation,
+    // opening, writing, or closing fails; otherwise return true.
+    bool writeText(const std::filesystem::path &filePath,
+                   const std::string &text);
 
 } // namespace minigit
