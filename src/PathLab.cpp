@@ -6,4 +6,10 @@ namespace minigit
     {
         return root / ".minigit";
     }
+
+    std::filesystem::path headPath(const std::filesystem::path &root)
+    {
+        return metadataDirectory(root) / "HEAD";
+    }
+
 } // namespace minigit
