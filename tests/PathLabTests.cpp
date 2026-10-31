@@ -96,6 +96,92 @@ bool testWriteText()
     return passed;
 }
 
+// Issue 4: read files made by writeText and report failures without crashing.
+bool testReadText()
+{
+    std::error_code error;
+    const auto tempBase = std::filesystem::temp_directory_path(error);
+    if (!check(!error, "temporary directory should be available for reading tests"))
+    {
+        return false;
+    }
+
+    const auto uniqueId =
+        std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto tempRoot =
+        tempBase / ("minigit-read-test-" + std::to_string(uniqueId));
+
+    // Only remove a directory that this run created.
+    const bool created = std::filesystem::create_directory(tempRoot, error);
+    if (!check(created && !error,
+               "a new temporary reading-test directory should be created"))
+    {
+        return false;
+    }
+
+    // Include blank lines, spaces, and no final newline to catch lost text.
+    const auto filePath = tempRoot / "nested" / "notes.txt";
+    const std::string expected =
+        "Hello MiniGit!\n\n  Second line with spaces.\nLast line";
+    bool passed = check(minigit::writeText(filePath, expected),
+                        "writeText should create the file used by readText");
+
+    std::string actual = "old contents";
+    std::string errorMessage = "old error";
+    const bool readSucceeded = minigit::readText(filePath, actual, errorMessage);
+    if (!check(readSucceeded && actual == expected && errorMessage.empty(),
+               "readText should return exact contents and clear an old error"))
+    {
+        passed = false;
+    }
+
+    const auto missingPath = tempRoot / "missing.txt";
+    const bool missingSucceeded =
+        minigit::readText(missingPath, actual, errorMessage);
+    if (!check(!missingSucceeded && actual.empty() &&
+                   errorMessage.find(missingPath.string()) != std::string::npos,
+               "a missing file should fail with its path and no stale contents"))
+    {
+        passed = false;
+    }
+
+    // Empty text is a successful read, distinct from a missing-file failure.
+    const auto emptyPath = tempRoot / "empty.txt";
+    if (!check(minigit::writeText(emptyPath, ""),
+               "writeText should create an empty file"))
+    {
+        passed = false;
+    }
+    actual = "old contents";
+    const bool emptySucceeded = minigit::readText(emptyPath, actual, errorMessage);
+    if (!check(emptySucceeded && actual.empty() && errorMessage.empty(),
+               "an empty file should succeed and clear the previous error"))
+    {
+        passed = false;
+    }
+
+    // A directory exists but cannot be read as a text file. This avoids
+    // relying on operating-system-specific permission settings in the test.
+    const bool directorySucceeded =
+        minigit::readText(tempRoot, actual, errorMessage);
+    if (!check(!directorySucceeded && actual.empty() && !errorMessage.empty(),
+               "an unreadable file path should report a useful failure"))
+    {
+        passed = false;
+    }
+
+    // All reader streams have closed before cleanup, including on Windows.
+    // Record failures above instead of returning early so cleanup still runs.
+    std::error_code cleanupError;
+    std::filesystem::remove_all(tempRoot, cleanupError);
+    if (!check(!cleanupError, "temporary reading-test files should be removed"))
+    {
+        passed = false;
+    }
+
+    return passed;
+}
+
 int main()
 {
     // Baseline smoke check.
@@ -136,6 +222,11 @@ int main()
 
     // Return a nonzero exit status so CTest reports a failed writing check.
     if (!testWriteText())
+    {
+        return 1;
+    }
+
+    if (!testReadText())
     {
         return 1;
     }
