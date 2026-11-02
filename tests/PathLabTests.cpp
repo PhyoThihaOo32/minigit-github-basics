@@ -1,5 +1,8 @@
 #include "PathLab.hpp"
 #include <iostream>
+#include <filesystem>
+#include <string>
+#include <fstream>
 
 bool check(bool condition, const char* message) {
     if (!condition) {
@@ -37,5 +40,31 @@ int main() {
         "headPath should append .minigit/HEAD to the nested root path")){
             return 1;
     }
+
+    //issue 3: testing writeToFile with nested directories
+    std::filesystem::path tempFolder = std::filesystem::temp_directory_path() / "minigit_test3";
+    const std::filesystem::path filePath = tempFolder / "nested" / "notes.txt";
+    
+    std::filesystem::remove_all(tempFolder); // Clean up any previous test
+    
+    if (!check(minigit::writeToFile(filePath, "Hello, world!"), "writeToFile should write to the file")) {
+        std::filesystem::remove_all(tempFolder); // Clean up after test
+        return 1;
+    }
+
+    std::ifstream file(filePath);
+    std::string content;
+    if (!check(file.is_open(), "file should open")) {
+        std::filesystem::remove_all(tempFolder); // Clean up after test
+        return 1;
+    }
+    std::getline(file, content);
+    file.close();
+    
+    if (!check(content == "Hello, world!", "The file should have the right text content")) {
+        std::filesystem::remove_all(tempFolder); // Clean up after test
+        return 1;
+    }
+    std::filesystem::remove_all(tempFolder); // Clean up after test
     return 0;
 }
