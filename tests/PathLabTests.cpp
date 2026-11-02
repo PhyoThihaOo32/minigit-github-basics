@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <fstream>
+#include <system_error>
 
 bool check(bool condition, const char* message) {
     if (!condition) {
@@ -24,7 +25,7 @@ int main() {
 
     const std::filesystem::path root = "course/repo";
     if (!check(minigit::metadataDirectory(root) == root / ".minigit",
-        "metadataDirectory should append .minigit to the root paath")){
+        "metadataDirectory should append .minigit to the root path")){
             return 1;
     }
     std::cout << "PathLab smoke check passed\n";
@@ -42,29 +43,119 @@ int main() {
     }
 
     //issue 3: testing writeToFile with nested directories
-    std::filesystem::path tempFolder = std::filesystem::temp_directory_path() / "minigit_test3";
-    const std::filesystem::path filePath = tempFolder / "nested" / "notes.txt";
-    
-    std::filesystem::remove_all(tempFolder); // Clean up any previous test
-    
-    if (!check(minigit::writeToFile(filePath, "Hello, world!"), "writeToFile should write to the file")) {
-        std::filesystem::remove_all(tempFolder); // Clean up after test
+     std::error_code error;
+    std::filesystem::path tempBase =
+        std::filesystem::temp_directory_path(error);
+
+    if (!check(!error, "Temporary directory should be available")) {
         return 1;
+    }
+
+    // Give each test run a different starting name
+    std::string name = "minigit_test3_" +
+        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+
+    std::filesystem::path tempFolder, secondFolder;
+    bool created = false;
+    bool passed = true;
+
+    // Create the first folder without deleting existing folders
+    for (int i = 0; i < 100; i++) {
+        tempFolder = tempBase / (name + "_" + std::to_string(i));
+        error.clear();
+        created = std::filesystem::create_directory(tempFolder, error);
+
+        if (created || error) {
+            break;
+        }
+    }
+
+    if (!check(created && !error, "First folder should be created")) {
+        return 1;
+    }
+
+    // Create a sentinel file to check that collisions are safe
+    std::ofstream sentinel(tempFolder / "sentinel.txt");
+    sentinel << "Keep this file";
+    sentinel.close();
+
+    if (!check(!sentinel.fail(), "Sentinel should be written")) {
+        passed = false;
+    }
+
+    // Start with the same name to force a collision
+    bool secondCreated = false;
+
+    for (int i = 0; i < 100; i++) {
+        secondFolder = tempBase / (name + "_" + std::to_string(i));
+        error.clear();
+        secondCreated = std::filesystem::create_directory(secondFolder, error);
+
+        if (secondCreated || error) {
+            break;
+        }
+    }
+
+    if (!check(secondCreated && !error && secondFolder != tempFolder,
+               "Second folder should use a different name")) {
+        passed = false;
+    }
+
+    if (!check(std::filesystem::exists(tempFolder / "sentinel.txt"),
+               "Existing sentinel should remain")) {
+        passed = false;
+    }
+
+    // Test writeToFile with a nested directory
+    const std::filesystem::path filePath =
+        tempFolder / "nested" / "notes.txt";
+
+    if (!check(minigit::writeToFile(filePath, "Hello, world!"),
+               "writeToFile should write to the file")) {
+        passed = false;
     }
 
     std::ifstream file(filePath);
     std::string content;
-    if (!check(file.is_open(), "file should open")) {
-        std::filesystem::remove_all(tempFolder); // Clean up after test
-        return 1;
+
+    if (!check(file.is_open(), "File should open")) {
+        passed = false;
     }
-    std::getline(file, content);
+    else {
+        std::getline(file, content);
+        if (!check(content == "Hello, world!",
+                   "File should have the right text")) {
+            passed = false;
+        }
+    }
     file.close();
-    
-    if (!check(content == "Hello, world!", "The file should have the right text content")) {
-        std::filesystem::remove_all(tempFolder); // Clean up after test
+
+    // Remove only our first folder
+    error.clear();
+    std::filesystem::remove_all(tempFolder, error);
+
+    if (!check(!error, "First folder should be removed")) {
+        passed = false;
+    }
+
+    // The second folder must still exist
+    if (secondCreated) {
+        if (!check(std::filesystem::exists(secondFolder),
+                   "Second folder should still exist")) {
+            passed = false;
+        }
+
+        error.clear();
+        std::filesystem::remove_all(secondFolder, error);
+
+        if (!check(!error, "Second folder should be removed")) {
+            passed = false;
+        }
+    }
+
+    if (!passed) {
         return 1;
     }
-    std::filesystem::remove_all(tempFolder); // Clean up after test
+
     return 0;
 }
