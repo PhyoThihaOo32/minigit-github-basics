@@ -13,4 +13,6 @@ std::filesystem::path metadataDirectory(const std::filesystem::path& root);
 std::filesystem::path headPath(const std::filesystem::path& root);
 //writing into file
 bool writeToFile(const std::filesystem::path& filePath, const std::string& text);
+//read from file
+bool readFromFile(const std::filesystem::path& filePath, std::string& text);
 } // namespace minigit

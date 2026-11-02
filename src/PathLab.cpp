@@ -32,4 +32,19 @@ bool writeToFile(const std::filesystem::path& filePath, const std::string& text)
     file.close();
     return !file.fail();
 }
+//read from file
+bool readFromFile(const std::filesystem::path& filePath, std::string& text) {
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        return false;
+    }
+    text.clear();
+    text = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    if(file.bad()){
+        return false;
+    }
+    file.close();
+    return true;
+}
 } // namespace minigit

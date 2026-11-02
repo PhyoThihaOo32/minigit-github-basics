@@ -148,11 +148,43 @@ int main() {
         passed = false;
     }
 
+    //issue 4: read from file
+    const std::filesystem::path readPath = tempFolder / "test.txt";
+    const std::string testContent = "This is a test content.";
+
+    std::string readContent;
+
+    if (!check(minigit::writeToFile(readPath, testContent),
+               "Test file should be written")) {
+        passed = false;
+    }
+
+    if (!check(minigit::readFromFile(readPath, readContent),
+               "readFromFile should read the file")) {
+        passed = false;
+    }
+
+    if (!check(readContent == testContent,
+               "File contents should match exactly")) {
+        passed = false;
+    }
+
+    // Test reading a missing file
+    const std::filesystem::path missingPath = tempFolder / "missing.txt";
+
+    if (!check(!minigit::readFromFile(missingPath, readContent),
+               "Missing file should return false")) {
+        passed = false;
+    }
+    
     // Every check above returns here, even on failure. File streams have already
     // closed, and only the directory successfully claimed by this run is removed.
+    //moved it so it evolves all tests
+    error.clear();
     std::filesystem::remove_all(tempFolder, error);
     if (!check(!error, "this run's temporary directory should be cleaned up")) {
         passed = false;
     }
     return passed ? 0 : 1;
+
 }
