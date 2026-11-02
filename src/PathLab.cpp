@@ -7,5 +7,10 @@ namespace minigit {
         return root / ".minigit";
     }
 // Implement the focused behavior described by the active Issue.
+
+// Issue 2
+std::filesystem::path headFile(const std::filesystem::path& root) {
+    return metadataDirectory(root) / "HEAD";
+}
 } // namespace minigit
-//  don't mind this line I had to add something so i can push again!
+
