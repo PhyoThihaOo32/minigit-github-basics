@@ -25,5 +25,17 @@ int main() {
             return 1;
     }
     std::cout << "PathLab smoke check passed\n";
+
+    //testing headPath with normal root:
+    if (!check(minigit::headPath(root) == minigit::metadataDirectory(root) / "HEAD",
+        "headPath should append .minigit/HEAD to the root path")){
+            return 1;
+    }
+    //testing headPath with nested root:
+    const std::filesystem::path nestedRoot = root / "nested";
+    if (!check(minigit::headPath(nestedRoot) == minigit::metadataDirectory(nestedRoot) / "HEAD",
+        "headPath should append .minigit/HEAD to the nested root path")){
+            return 1;
+    }
     return 0;
 }
