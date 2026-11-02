@@ -27,4 +27,14 @@ struct WriteResult {
 // (replacing any existing contents). Takes a finished path; it does not build paths.
 WriteResult writeTextFile(const std::filesystem::path& filePath, const std::string& text);
 
+struct ReadResult {
+    bool ok = false;
+    std::string text;
+    std::string error;
+};
+
+// Read the whole file at filePath as text. A missing file or a file that cannot be
+// read is reported through the result; this function does not throw or crash.
+ReadResult readTextFile(const std::filesystem::path& filePath);
+
 } // namespace minigit

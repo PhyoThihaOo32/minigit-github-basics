@@ -83,6 +83,47 @@ int main() {
         return 1;
     }
 
+    // ===== Issue 4: readTextFile =====
+    const std::filesystem::path readRoot =
+        std::filesystem::temp_directory_path() / "minigit-issue4-test";
+    std::filesystem::remove_all(readRoot);
+
+    bool issue4Passed = true;
+
+    // Success case: read back exactly what writeTextFile wrote.
+    const std::filesystem::path readFile = readRoot / "notes" / "hello.txt";
+    const std::string expected = "first line\nsecond line\n";
+    issue4Passed = check(minigit::writeTextFile(readFile, expected).ok,
+                         "setup: writeTextFile should create the file to read")
+                   && check(minigit::readTextFile(readFile).ok,
+                            "readTextFile should succeed for an existing file")
+                   && check(minigit::readTextFile(readFile).text == expected,
+                            "readTextFile should return exactly the written text");
+
+    // Missing file: reported as a failure with a message, no crash.
+    if (issue4Passed) {
+        const minigit::ReadResult missing = minigit::readTextFile(readRoot / "missing.txt");
+        issue4Passed = check(!missing.ok, "readTextFile should report failure for a missing file")
+                       && check(!missing.error.empty(), "a missing file should explain the error")
+                       && check(missing.text.empty(), "a failed read should return no text");
+    }
+
+    // A folder is not a readable text file.
+    if (issue4Passed) {
+        const minigit::ReadResult folder = minigit::readTextFile(readRoot / "notes");
+        issue4Passed = check(!folder.ok, "readTextFile should report failure for a directory")
+                       && check(!folder.error.empty(), "reading a directory should explain the error");
+    }
+
+    // Clean up before returning, whether the checks passed or not.
+    std::filesystem::remove_all(readRoot, cleanupError);
+    if (!issue4Passed) {
+        return 1;
+    }
+    if (!check(!std::filesystem::exists(readRoot), "issue 4 temporary files should be removed")) {
+        return 1;
+    }
+
     std::cout << "PathLab smoke check passed\n";
     return 0;
 }

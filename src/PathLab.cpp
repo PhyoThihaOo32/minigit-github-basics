@@ -1,6 +1,7 @@
 #include "PathLab.hpp"
 #include <fstream>
 #include <system_error>
+#include <sstream>
 
 namespace minigit {
 
@@ -39,6 +40,31 @@ WriteResult writeTextFile(const std::filesystem::path& filePath, const std::stri
     }
 
     return {true, ""};
+}
+
+// Issue 4
+ReadResult readTextFile(const std::filesystem::path& filePath) {
+    std::error_code ec;
+
+    if (!std::filesystem::exists(filePath, ec)) {
+        return {false, "", "file does not exist: '" + filePath.string() + "'"};
+    }
+    if (!std::filesystem::is_regular_file(filePath, ec)) {
+        return {false, "", "not a regular file: '" + filePath.string() + "'"};
+    }
+
+    std::ifstream in(filePath, std::ios::binary);
+    if (!in) {
+        return {false, "", "could not open '" + filePath.string() + "' for reading"};
+    }
+
+    std::ostringstream contents;
+    contents << in.rdbuf();
+    if (in.bad()) {
+        return {false, "", "could not read '" + filePath.string() + "'"};
+    }
+
+    return {true, contents.str(), ""};
 }
 } // namespace minigit
 
