@@ -1,8 +1,11 @@
 #include "PathLab.hpp"
-#include <iostream>
-#include <sstream>
-#include <string>
+#include "TestDirectory.hpp"
+#include <chrono>
 #include <fstream>
+#include <iostream>
+#include <iterator>
+#include <string>
+#include <system_error>
 
 bool check(bool condition, const char* message) {
     if (!condition) {
@@ -11,119 +14,163 @@ bool check(bool condition, const char* message) {
     }
     return true;
 }
-// Issue 3 test helper: read a whole file back as text.
-std::string readTextFile(const std::filesystem::path& filePath) {
-    std::ifstream in(filePath, std::ios::binary);
-    std::ostringstream contents;
-    contents << in.rdbuf();
-    return contents.str();
+
+bool testPaths() {
+    const std::filesystem::path root = "repo";
+    const auto nested = std::filesystem::path("course") / "projects" / "repo";
+    return check(minigit::metadataDirectory(root) == root / ".minigit",
+                 "metadataDirectory should append .minigit")
+        && check(minigit::headPath(root) == root / ".minigit" / "HEAD",
+                 "main's headPath API should work for a normal root")
+        && check(minigit::headPath(nested) == nested / ".minigit" / "HEAD",
+                 "main's headPath API should work for a nested root")
+        && check(minigit::headFile(root) == minigit::headPath(root) &&
+                 minigit::headFile(nested) == minigit::headPath(nested),
+                 "headFile should stay compatible with headPath");
 }
+
+bool testWriting(const std::filesystem::path& root) {
+    const auto nestedFile = root / "a" / "b" / "c" / "note.txt";
+    const std::string expected = "hello minigit\n";
+    const auto written = minigit::writeTextFile(nestedFile, expected);
+    if (!check(written.ok && written.error.empty(), "nested writing should succeed")) {
+        return false;
+    }
+    std::ifstream input(nestedFile, std::ios::binary);
+    if (!check(input.is_open(), "the written file should open independently")) {
+        return false;
+    }
+    const std::string actual((std::istreambuf_iterator<char>(input)),
+                             std::istreambuf_iterator<char>());
+    if (!check(actual == expected, "the complete written text should match")) {
+        return false;
+    }
+
+    const auto blocker = root / "blocker";
+    if (!check(minigit::writeTextFile(blocker, "not a folder").ok,
+               "the invalid-parent fixture should be created")) {
+        return false;
+    }
+    const auto blocked = minigit::writeTextFile(blocker / "child.txt", expected);
+    return check(!blocked.ok && !blocked.error.empty(),
+                 "writing below a regular file should return an error");
+}
+
+bool testReading(const std::filesystem::path& root) {
+    const auto file = root / "notes" / "hello.txt";
+    const std::string expected = " first line\n\nsecond line without a final newline";
+    if (!check(minigit::writeTextFile(file, expected).ok,
+               "the writer should create the file used by the reader")) {
+        return false;
+    }
+    const auto read = minigit::readTextFile(file);
+    if (!check(read.ok && read.text == expected && read.error.empty(),
+               "reading should preserve spaces, blank lines, and the final character")) {
+        return false;
+    }
+
+    const auto missing = minigit::readTextFile(root / "missing.txt");
+    if (!check(!missing.ok && missing.text.empty() && !missing.error.empty(),
+               "a missing file should return an error without partial text")) {
+        return false;
+    }
+    const auto folder = minigit::readTextFile(file.parent_path());
+    if (!check(!folder.ok && folder.text.empty() && !folder.error.empty(),
+               "a directory should not be read as a text file")) {
+        return false;
+    }
+
+    const auto emptyPath = root / "empty.txt";
+    if (!check(minigit::writeTextFile(emptyPath, "").ok, "an empty file should be created")) {
+        return false;
+    }
+    const auto empty = minigit::readTextFile(emptyPath);
+    return check(empty.ok && empty.text.empty() && empty.error.empty(),
+                 "an empty file should be a successful read");
+}
+
+// Returning false simulates a failed check. The directory object must still
+// remove its own files before control returns to the caller.
+bool simulateFailedCheck(const std::filesystem::path& parent,
+                         std::filesystem::path& createdPath) {
+    TestDirectory directory;
+    std::error_code error;
+    if (!directory.create(parent, "failed-check", error)) {
+        return false;
+    }
+    createdPath = directory.path();
+    minigit::writeTextFile(createdPath / "fixture.txt", "test data");
+    return false;
+}
+
+bool testDirectoryOwnership(const std::filesystem::path& root) {
+    const auto existing = root / "candidate-0";
+    const auto sentinel = existing / "keep.txt";
+    if (!check(minigit::writeTextFile(sentinel, "keep me").ok,
+               "an existing candidate fixture should be created")) {
+        return false;
+    }
+
+    TestDirectory first;
+    TestDirectory second;
+    std::error_code error;
+    if (!check(first.create(root, "candidate", error) &&
+               second.create(root, "candidate", error),
+               "two runs should claim separate directories despite a collision")) {
+        return false;
+    }
+    if (!check(first.path() != existing && second.path() != existing &&
+               first.path() != second.path(), "existing candidates must never be reused")) {
+        return false;
+    }
+    if (!check(first.cleanup(error), "the first owned directory should be removed")) {
+        return false;
+    }
+    const bool secondExists = std::filesystem::exists(second.path(), error);
+    const auto preserved = minigit::readTextFile(sentinel);
+    if (!check(secondExists && !error && preserved.ok && preserved.text == "keep me",
+               "cleanup should preserve another run and an existing sentinel")) {
+        return false;
+    }
+    if (!check(second.cleanup(error), "the second owned directory should be removed")) {
+        return false;
+    }
+
+    std::filesystem::path failedPath;
+    const bool failedCheck = simulateFailedCheck(root, failedPath);
+    const bool leftover = std::filesystem::exists(failedPath, error);
+    return check(!failedCheck && !failedPath.empty() && !leftover && !error,
+                 "a failed check should still clean its owned directory");
+}
+
 int main() {
-    // Baseline smoke check: the project and CTest wiring work before students
-    // begin the path Issues. Add focused assertions with each Issue.
-    std::filesystem::path sample = "course/repo";
-    if (sample.filename() != "repo") {
-        std::cerr << "path smoke check failed\n";
+    if (!testPaths()) {
         return 1;
     }
-    const std::filesystem::path root = "course/repo";
-    const std::filesystem::path nestedRoot = std::filesystem::path("course") / "projects" / "repo";
-
-    if(!check(minigit::metadataDirectory(root) == root / ".minigit", "metadataDirectory should append .minigit to the root path")){
+    std::error_code error;
+    const auto tempBase = std::filesystem::temp_directory_path(error);
+    if (!check(!error, "the system temporary directory should be available")) {
         return 1;
     }
-    
-
-      // ===== Issue 2: headFile =====
-    if (!check(minigit::headFile(root) == minigit::metadataDirectory(root) / "HEAD",
-               "headFile should append HEAD to the metadata directory")) {
+    const auto runId = std::chrono::steady_clock::now().time_since_epoch().count();
+    TestDirectory temporary;
+    if (!check(temporary.create(tempBase, "minigit-project-test-" + std::to_string(runId), error),
+               "this run should claim its own temporary directory")) {
         return 1;
     }
 
-    if (!check(minigit::headFile(nestedRoot) == nestedRoot / ".minigit" / "HEAD",
-               "headFile should return .minigit/HEAD under a nested root path")) {
-        return 1;
+    bool passed = testWriting(temporary.path() / "issue3");
+    if (!testReading(temporary.path() / "issue4")) {
+        passed = false;
     }
-      // ===== Issue 3: writeTextFile =====
-    // Work in a fresh temporary folder so the test never touches the project.
-    const std::filesystem::path tempRoot =
-        std::filesystem::temp_directory_path() / "minigit-issue3-test";
-    std::filesystem::remove_all(tempRoot);
-
-    bool issue3Passed = true;
-
-    // Success case: parent folders a/b/c do not exist yet.
-    const std::filesystem::path nestedFile = tempRoot / "a" / "b" / "c" / "note.txt";
-    const std::string text = "hello minigit\n";
-    const minigit::WriteResult written = minigit::writeTextFile(nestedFile, text);
-
-    issue3Passed = check(written.ok, "writeTextFile should succeed in a new nested directory")
-                   && check(std::filesystem::is_directory(nestedFile.parent_path()),
-                            "writeTextFile should create the missing parent directories")
-                   && check(readTextFile(nestedFile) == text,
-                            "the written file should contain exactly the supplied text");
-
-    // Failure case: the "parent" is a regular file, so a directory cannot be created there.
-    if (issue3Passed) {
-        const std::filesystem::path blocker = tempRoot / "blocker";
-        minigit::writeTextFile(blocker, "not a folder");
-        const minigit::WriteResult blocked = minigit::writeTextFile(blocker / "child.txt", text);
-
-        issue3Passed = check(!blocked.ok, "writeTextFile should report failure when a parent is a file")
-                       && check(!blocked.error.empty(), "a failed write should explain the error");
+    if (!testDirectoryOwnership(temporary.path())) {
+        passed = false;
     }
-
-    // Clean up before returning, whether the checks passed or not.
-    std::error_code cleanupError;
-    std::filesystem::remove_all(tempRoot, cleanupError);
-    if (!issue3Passed) {
-        return 1;
+    if (!check(temporary.cleanup(error), "all owned test files should be removed")) {
+        passed = false;
     }
-    if (!check(!std::filesystem::exists(tempRoot), "temporary test files should be removed")) {
-        return 1;
+    if (passed) {
+        std::cout << "All PathLab checks passed\n";
     }
-
-    // ===== Issue 4: readTextFile =====
-    const std::filesystem::path readRoot =
-        std::filesystem::temp_directory_path() / "minigit-issue4-test";
-    std::filesystem::remove_all(readRoot);
-
-    bool issue4Passed = true;
-
-    // Success case: read back exactly what writeTextFile wrote.
-    const std::filesystem::path readFile = readRoot / "notes" / "hello.txt";
-    const std::string expected = "first line\nsecond line\n";
-    issue4Passed = check(minigit::writeTextFile(readFile, expected).ok,
-                         "setup: writeTextFile should create the file to read")
-                   && check(minigit::readTextFile(readFile).ok,
-                            "readTextFile should succeed for an existing file")
-                   && check(minigit::readTextFile(readFile).text == expected,
-                            "readTextFile should return exactly the written text");
-
-    // Missing file: reported as a failure with a message, no crash.
-    if (issue4Passed) {
-        const minigit::ReadResult missing = minigit::readTextFile(readRoot / "missing.txt");
-        issue4Passed = check(!missing.ok, "readTextFile should report failure for a missing file")
-                       && check(!missing.error.empty(), "a missing file should explain the error")
-                       && check(missing.text.empty(), "a failed read should return no text");
-    }
-
-    // A folder is not a readable text file.
-    if (issue4Passed) {
-        const minigit::ReadResult folder = minigit::readTextFile(readRoot / "notes");
-        issue4Passed = check(!folder.ok, "readTextFile should report failure for a directory")
-                       && check(!folder.error.empty(), "reading a directory should explain the error");
-    }
-
-    // Clean up before returning, whether the checks passed or not.
-    std::filesystem::remove_all(readRoot, cleanupError);
-    if (!issue4Passed) {
-        return 1;
-    }
-    if (!check(!std::filesystem::exists(readRoot), "issue 4 temporary files should be removed")) {
-        return 1;
-    }
-
-    std::cout << "PathLab smoke check passed\n";
-    return 0;
+    return passed ? 0 : 1;
 }
