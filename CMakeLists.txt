@@ -13,4 +13,14 @@ if(BUILD_TESTING)
     add_executable(path_lab_tests tests/PathLabTests.cpp)
     target_link_libraries(path_lab_tests PRIVATE minigit_paths)
     add_test(NAME path_lab_tests COMMAND path_lab_tests)
+
+    add_executable(read_failure_tests tests/ReadFailureTests.cpp)
+    target_link_libraries(read_failure_tests PRIVATE minigit_paths)
+    target_include_directories(read_failure_tests PRIVATE src)
+    add_test(NAME read_failure_tests COMMAND read_failure_tests)
+
+    # Keep the merged Issue 3 suite exercising the existing bool writing API.
+    add_executable(issue3_compatibility_tests tests/Issue3CompatibilityTests.cpp)
+    target_link_libraries(issue3_compatibility_tests PRIVATE minigit_paths)
+    add_test(NAME issue3_compatibility_tests COMMAND issue3_compatibility_tests)
 endif()
