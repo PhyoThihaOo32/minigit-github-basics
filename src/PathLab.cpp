@@ -17,6 +17,10 @@ std::filesystem::path headFile(const std::filesystem::path& root) {
     return headPath(root);
 }
 
+bool writeToFile(const std::filesystem::path& filePath, const std::string& text) {
+    return writeTextFile(filePath, text).ok;
+}
+
 WriteResult writeTextFile(const std::filesystem::path& filePath,
                           const std::string& text) {
     const std::filesystem::path parent = filePath.parent_path();

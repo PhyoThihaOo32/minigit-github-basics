@@ -53,7 +53,9 @@ bool testWriting(const std::filesystem::path& root) {
     }
     const auto blocked = minigit::writeTextFile(blocker / "child.txt", expected);
     return check(!blocked.ok && !blocked.error.empty(),
-                 "writing below a regular file should return an error");
+                 "writing below a regular file should return an error")
+        && check(!minigit::writeToFile(blocker / "child.txt", expected),
+                 "the existing bool writer should also report a failed write");
 }
 
 bool testReading(const std::filesystem::path& root) {
@@ -66,6 +68,19 @@ bool testReading(const std::filesystem::path& root) {
     const auto read = minigit::readTextFile(file);
     if (!check(read.ok && read.text == expected && read.error.empty(),
                "reading should preserve spaces, blank lines, and the final character")) {
+        return false;
+    }
+
+    // Files written through main's bool API must use the same text convention
+    // as the structured writer, including on Windows.
+    const auto compatibilityPath = root / "existing-writer.txt";
+    if (!check(minigit::writeToFile(compatibilityPath, expected),
+               "the existing bool writer should create a readable text file")) {
+        return false;
+    }
+    const auto compatibilityRead = minigit::readTextFile(compatibilityPath);
+    if (!check(compatibilityRead.ok && compatibilityRead.text == expected,
+               "the reader should preserve exact text from the existing writer")) {
         return false;
     }
 
