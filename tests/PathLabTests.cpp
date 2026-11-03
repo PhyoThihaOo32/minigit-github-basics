@@ -111,8 +111,13 @@ int main() {
     std::cout << "PathLab smoke check passed\n";
 
     const std::filesystem::path root = "course/repo";
+    const std::filesystem::path nestedRoot = root / "nested";
     if (!check(minigit::metadataDirectory(root) == root / ".minigit",
-        "metadataDirectory should append .minigit to the root paath")){
+        "metadataDirectory should append .minigit to the root path")){
+            return 1;
+    }
+    if (!check(minigit::metadataDirectory(nestedRoot) == nestedRoot / ".minigit",
+        "metadataDirectory should append .minigit to a nested root path")){
             return 1;
     }
     std::cout << "PathLab smoke check passed\n";
@@ -123,7 +128,6 @@ int main() {
             return 1;
     }
     //testing headPath with nested root:
-    const std::filesystem::path nestedRoot = root / "nested";
     if (!check(minigit::headPath(nestedRoot) == minigit::metadataDirectory(nestedRoot) / "HEAD",
         "headPath should append .minigit/HEAD to the nested root path")){
             return 1;
