@@ -21,12 +21,9 @@ bool testPaths() {
     return check(minigit::metadataDirectory(root) == root / ".minigit",
                  "metadataDirectory should append .minigit")
         && check(minigit::headPath(root) == root / ".minigit" / "HEAD",
-                 "main's headPath API should work for a normal root")
+                 "headPath should work for a normal root")
         && check(minigit::headPath(nested) == nested / ".minigit" / "HEAD",
-                 "main's headPath API should work for a nested root")
-        && check(minigit::headFile(root) == minigit::headPath(root) &&
-                 minigit::headFile(nested) == minigit::headPath(nested),
-                 "headFile should stay compatible with headPath");
+                 "headPath should work for a nested root");
 }
 
 bool testWriting(const std::filesystem::path& root) {
@@ -53,9 +50,7 @@ bool testWriting(const std::filesystem::path& root) {
     }
     const auto blocked = minigit::writeTextFile(blocker / "child.txt", expected);
     return check(!blocked.ok && !blocked.error.empty(),
-                 "writing below a regular file should return an error")
-        && check(!minigit::writeToFile(blocker / "child.txt", expected),
-                 "the existing bool writer should also report a failed write");
+                 "writing below a regular file should return an error");
 }
 
 bool testReading(const std::filesystem::path& root) {
@@ -68,19 +63,6 @@ bool testReading(const std::filesystem::path& root) {
     const auto read = minigit::readTextFile(file);
     if (!check(read.ok && read.text == expected && read.error.empty(),
                "reading should preserve spaces, blank lines, and the final character")) {
-        return false;
-    }
-
-    // Files written through main's bool API must use the same text convention
-    // as the structured writer, including on Windows.
-    const auto compatibilityPath = root / "existing-writer.txt";
-    if (!check(minigit::writeToFile(compatibilityPath, expected),
-               "the existing bool writer should create a readable text file")) {
-        return false;
-    }
-    const auto compatibilityRead = minigit::readTextFile(compatibilityPath);
-    if (!check(compatibilityRead.ok && compatibilityRead.text == expected,
-               "the reader should preserve exact text from the existing writer")) {
         return false;
     }
 

@@ -8,12 +8,6 @@ namespace minigit {
 std::filesystem::path metadataDirectory(const std::filesystem::path& root);
 std::filesystem::path headPath(const std::filesystem::path& root);
 
-// Keep Ariane's existing name compatible with the headPath API already on main.
-std::filesystem::path headFile(const std::filesystem::path& root);
-
-// Preserve the Issue 3 bool interface; both writers use the same implementation.
-bool writeToFile(const std::filesystem::path& filePath, const std::string& text);
-
 struct WriteResult {
     bool ok = false;
     std::string error;
