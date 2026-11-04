@@ -9,17 +9,6 @@ std::filesystem::path metadataDirectory(const std::filesystem::path& root) {
     return root / ".minigit";
 }
 
-std::filesystem::path headPath(const std::filesystem::path& root) {
-    return metadataDirectory(root) / "HEAD";
-}
-
-std::filesystem::path headFile(const std::filesystem::path& root) {
-    return headPath(root);
-}
-
-bool writeToFile(const std::filesystem::path& filePath, const std::string& text) {
-    return writeTextFile(filePath, text).ok;
-}
 
 WriteResult writeTextFile(const std::filesystem::path& filePath,
                           const std::string& text) {
