@@ -19,8 +19,8 @@ if(BUILD_TESTING)
     target_include_directories(read_failure_tests PRIVATE src)
     add_test(NAME read_failure_tests COMMAND read_failure_tests)
 
-    # Keep the merged Issue 3 suite exercising the existing bool writing API.
-    add_executable(issue3_compatibility_tests tests/Issue3CompatibilityTests.cpp)
-    target_link_libraries(issue3_compatibility_tests PRIVATE minigit_paths)
-    add_test(NAME issue3_compatibility_tests COMMAND issue3_compatibility_tests)
+    # Keep the Issue 3 writing and directory-isolation regression checks.
+    add_executable(issue3_tests tests/Issue3Tests.cpp)
+    target_link_libraries(issue3_tests PRIVATE minigit_paths)
+    add_test(NAME issue3_tests COMMAND issue3_tests)
 endif()

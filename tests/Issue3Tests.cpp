@@ -39,10 +39,12 @@ bool createTestDirectory(const std::filesystem::path& parent,
 
 // This function does not own tempFolder. Returning on failure is safe because
 // main cleans it up after this function (and its file stream) have returned.
-bool testWriteToFile(const std::filesystem::path& tempFolder) {
+bool testWriteTextFile(const std::filesystem::path& tempFolder) {
     const auto filePath = tempFolder / "nested" / "notes.txt";
-    if (!check(minigit::writeToFile(filePath, "Hello, world!"),
-               "writeToFile should write to the file")) {
+    const auto written = minigit::writeTextFile(filePath, "Hello, world!");
+    if (!check(written.ok && written.error.empty(),
+               "writeTextFile should write to the file")) {
+        std::cerr << written.error << '\n';
         return false;
     }
 
@@ -60,8 +62,10 @@ bool testWriteToFile(const std::filesystem::path& tempFolder) {
 bool testDirectoryIsolation(const std::filesystem::path& tempFolder) {
     const auto existingDirectory = tempFolder / "collision-0";
     const auto sentinelPath = existingDirectory / "keep.txt";
-    if (!check(minigit::writeToFile(sentinelPath, "keep me"),
+    const auto written = minigit::writeTextFile(sentinelPath, "keep me");
+    if (!check(written.ok && written.error.empty(),
                "the existing-directory fixture should be created")) {
+        std::cerr << written.error << '\n';
         return false;
     }
 
@@ -143,7 +147,7 @@ int main() {
         return 1;
     }
 
-    bool passed = testWriteToFile(tempFolder);
+    bool passed = testWriteTextFile(tempFolder);
     if (!testDirectoryIsolation(tempFolder)) {
         passed = false;
     }
