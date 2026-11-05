@@ -15,20 +15,18 @@ bool checkRoots(const std::filesystem::path& root) {
     return true;
 }
 
-void testHeadAndIndexPaths(const std::filesystem::path& root) {
+bool testHeadAndIndexPaths(const std::filesystem::path& root) {
     const minigit::RepositoryPaths paths(root);
-    const auto expectedHead = root / ".minigit" / "HEAD";
-    const auto expectedIndex = root / ".minigit" / "index";
-//Verify derived paths for HEAD and index files are correct
-    if (paths.headFile() != expectedHead) {
-        std::cerr << "FAILED: headFile should return " << expectedHead << '\n';
+
+    if (paths.headFile() != root / ".minigit" / "HEAD") {
+        std::cerr << "FAILED: headFile should be " << root / ".minigit" / "HEAD" << '\n';
+        return false;
     }
-    if (paths.indexFile() != expectedIndex) {
-        std::cerr << "FAILED: indexFile should return " << expectedIndex << '\n';
+    if (paths.indexFile() != root / ".minigit" / "index") {
+        std::cerr << "FAILED: indexFile should be " << root / ".minigit" / "index" << '\n';
+        return false;
     }
-    //Verify if acceptance creates the correct paths for HEAD and index files
-    std::cout << "HEAD file path: " << paths.headFile() << '\n';
-    std::cout << "Index file path: " << paths.indexFile() << '\n';
+    return true;
 }
 
 
