@@ -1,0 +1,34 @@
+# Issue RP-2 Add headFile() and indexFile()
+
+## Goal
+
+Return the locations of the two MiniGit control files.
+
+## Dependency
+
+RP-1 merged.
+
+## Functions to add
+
+- `std::filesystem::path headFile() const;` returns `metadataRoot_ / "HEAD"`
+- `std::filesystem::path indexFile() const;` returns `metadataRoot_ / "index.txt"`
+
+## Acceptance criteria
+
+- Both functions build on `metadataRoot_`, not on `projectRoot_` plus a typed `.minigit`.
+- Neither function reads or creates the file.
+- Local CTest and Windows/Ubuntu CI pass.
+
+## Tests to write
+
+- For an ordinary and a nested root, compare each result with `root / ".minigit" / "HEAD"` and `root / ".minigit" / "index.txt"`.
+- `headFile().parent_path()` equals `metadataRoot()`.
+- `indexFile().filename()` equals `"index.txt"`.
+
+## Out of scope
+
+Writing HEAD or the index; stage and commit locations.
+
+## Reviewer focus
+
+Is `"HEAD"` written without a slash? (`metadataRoot_ / "/HEAD"` silently returns `/HEAD`.)

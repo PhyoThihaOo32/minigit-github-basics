@@ -1,0 +1,41 @@
+# Issue RP-1 Create RepositoryPaths with its project and metadata roots
+
+## Goal
+
+Add the `RepositoryPaths` class. It stores the project root it is given and derives the `.minigit` root from it.
+
+## Background
+
+In HW8, `metadataDirectory(root)` took the root as an argument on every call. A class can store the root once, in a member variable, so later functions need no argument.
+
+## Dependency
+
+HW8 (PathLab Issues 1-4) merged.
+
+## Functions to add
+
+- `include/RepositoryPaths.hpp` and `src/RepositoryPaths.cpp`, in `namespace minigit`
+- Member variables: `std::filesystem::path projectRoot_;` and `std::filesystem::path metadataRoot_;`
+- `explicit RepositoryPaths(std::filesystem::path projectRoot);`
+- `const std::filesystem::path& projectRoot() const;`
+- `const std::filesystem::path& metadataRoot() const;`
+
+## Acceptance criteria
+
+- The constructor stores `projectRoot` and sets `metadataRoot_` to `projectRoot_ / ".minigit"`.
+- Both getters return a `const` reference and change nothing.
+- Nothing is created on disk.
+- `CMakeLists.txt` adds `src/RepositoryPaths.cpp` to the `minigit_paths` library and registers a new `repository_paths_tests` executable with `add_test`.
+- Local CTest and Windows/Ubuntu CI pass.
+
+## Tests to write
+
+For the roots `"course/repo"` and `"course/team/repo"`: `projectRoot()` equals the root, and `metadataRoot()` equals `root / ".minigit"`.
+
+## Out of scope
+
+`headFile()`, `indexFile()` or any other location.
+
+## Reviewer focus
+
+Is `.minigit` joined with `/`? Is the new test registered, so CTest reports two tests instead of one?
