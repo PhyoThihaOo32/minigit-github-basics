@@ -16,8 +16,16 @@ const std::filesystem::path& RepositoryPaths::metadataRoot() const {
     return metadataRoot_;
 }
 
+//Returns the location of HEAD Reference inside metadata
+std::filesystem::path RepositoryPaths::headFile() const {
+    return metadataRoot_ / "HEAD";
+}
+//Returns the location of index file inside metadata
+std::filesystem::path RepositoryPaths::indexFile() const {
+    return metadataRoot_ / "index";
+}
+
 std::filesystem::path RepositoryPaths::stageFile(const std::string& path) const {
     return metadataRoot_ / "stage" / path;
-
 } // namespace minigit
 }

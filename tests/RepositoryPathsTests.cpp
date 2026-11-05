@@ -15,6 +15,20 @@ bool checkRoots(const std::filesystem::path& root) {
     return true;
 }
 
+bool testHeadAndIndexPaths(const std::filesystem::path& root) {
+    const minigit::RepositoryPaths paths(root);
+
+    if (paths.headFile() != root / ".minigit" / "HEAD") {
+        std::cerr << "FAILED: headFile should be " << root / ".minigit" / "HEAD" << '\n';
+        return false;
+    }
+    if (paths.indexFile() != root / ".minigit" / "index") {
+        std::cerr << "FAILED: indexFile should be " << root / ".minigit" / "index" << '\n';
+        return false;
+    }
+    return true;
+}
+
 
 bool checkStageFile(const std::filesystem::path& root) {
     const minigit::RepositoryPaths paths(root);
@@ -36,6 +50,8 @@ bool checkStageFile(const std::filesystem::path& root) {
     return true;
 }
 
+
+
 int main() {
     const auto normalRoot = std::filesystem::path("course") / "repo";
     const auto nestedRoot = std::filesystem::path("course") / "team" / "repo";
@@ -43,6 +59,8 @@ int main() {
     if (!checkRoots(normalRoot) || !checkRoots(nestedRoot)|| !checkStageFile(normalRoot) || !checkStageFile(nestedRoot)) {
         return 1;
     }
+    testHeadAndIndexPaths(normalRoot);
+    testHeadAndIndexPaths(nestedRoot);
 
     std::cout << "RepositoryPaths checks passed\n";
     return 0;
