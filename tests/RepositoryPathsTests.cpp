@@ -15,11 +15,32 @@ bool checkRoots(const std::filesystem::path& root) {
     return true;
 }
 
+
+bool checkStageFile(const std::filesystem::path& root) {
+    const minigit::RepositoryPaths paths(root);
+
+    if (paths.stageFile("notes.txt") != root / ".minigit" / "stage" / "notes.txt") {
+        std::cerr << "FAILED: stageFile for 'notes.txt'\n";
+        return false;
+    }
+
+    if (paths.stageFile("docs/notes.txt") != root / ".minigit" / "stage" / "docs" / "notes.txt") {
+        std::cerr << "FAILED: stageFile for 'docs/notes.txt'\n";
+        return false;
+    }
+
+    if (paths.stageFile("docs/notes.txt").filename() != "notes.txt") {
+        std::cerr << "FAILED: stageFile for filename\n";
+        return false;
+    }
+    return true;
+}
+
 int main() {
     const auto normalRoot = std::filesystem::path("course") / "repo";
     const auto nestedRoot = std::filesystem::path("course") / "team" / "repo";
 
-    if (!checkRoots(normalRoot) || !checkRoots(nestedRoot)) {
+    if (!checkRoots(normalRoot) || !checkRoots(nestedRoot)|| !checkStageFile(normalRoot) || !checkStageFile(nestedRoot)) {
         return 1;
     }
 
