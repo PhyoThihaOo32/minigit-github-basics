@@ -1,5 +1,5 @@
 #pragma once
-
+#include <string>
 #include <filesystem>
 
 namespace minigit {
@@ -11,6 +11,7 @@ public:
 
     const std::filesystem::path& projectRoot() const;
     const std::filesystem::path& metadataRoot() const;
+    std::filesystem::path stageFile(const std::string& path) const;
 
 private:
     std::filesystem::path projectRoot_;
