@@ -1,13 +1,22 @@
 #pragma once
-#include <string>
-#include <filesystem>
 
-namespace minigit {
+#include <filesystem>
+#include <string>
+
+namespace minigit
+{
 
 // Store repository locations without creating files or directories.
-class RepositoryPaths {
+class RepositoryPaths
+{
 public:
     explicit RepositoryPaths(std::filesystem::path projectRoot);
+
+    const std::filesystem::path &projectRoot() const;
+    const std::filesystem::path &metadataRoot() const;
+    std::filesystem::path stageFile(const std::string &path) const;
+    std::filesystem::path commitDirectory(const std::string &id) const;
+    std::filesystem::path committedFile(const std::string &id, const std::string &path) const;
 
     const std::filesystem::path& projectRoot() const;
     const std::filesystem::path& metadataRoot() const;
@@ -16,6 +25,8 @@ public:
     //Returns path to index file to track staged files
     std::filesystem::path indexFile() const;
     std::filesystem::path stageFile(const std::string& path) const;
+    // Normalize a relative file path or throw if its text is unsafe.
+    std::string safeRelativeFile(const std::string &argument) const;
 
 private:
     std::filesystem::path projectRoot_;
