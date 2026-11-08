@@ -12,9 +12,20 @@ const std::filesystem::path& RepositoryPaths::projectRoot() const {
     return projectRoot_;
 }
 
-const std::filesystem::path& RepositoryPaths::metadataRoot() const {
-    return metadataRoot_;
-}
+    const std::filesystem::path &RepositoryPaths::metadataRoot() const
+    {
+        return metadataRoot_;
+    }
+
+    std::filesystem::path RepositoryPaths::headFile() const
+    {
+        return metadataRoot_ / "HEAD";
+    }
+
+    std::filesystem::path RepositoryPaths::indexFile() const
+    {
+        return metadataRoot_ / "index";
+    }
 
 //Returns the location of HEAD Reference inside metadata
 std::filesystem::path RepositoryPaths::headFile() const {
