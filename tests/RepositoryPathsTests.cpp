@@ -222,6 +222,7 @@ int main()
     }
 
     bool passed = checkRoots(normalRoot) && checkRoots(nestedRoot)
+        && checkHeadAndIndexPaths(normalRoot) && checkHeadAndIndexPaths(nestedRoot)
         && checkStageFile(normalRoot) && checkStageFile(nestedRoot)
         && checkCommitDirectory(normalRoot) && checkCommitDirectory(nestedRoot)
         && checkCommittedFile(normalRoot) && checkCommittedFile(nestedRoot)
