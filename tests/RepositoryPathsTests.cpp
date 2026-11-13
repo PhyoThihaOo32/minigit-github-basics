@@ -1,5 +1,7 @@
 #include "RepositoryPaths.hpp"
+
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -16,6 +18,24 @@ bool checkRoots(const std::filesystem::path &root)
     if (paths.metadataRoot() != root / ".minigit")
     {
         std::cerr << "FAILED: metadataRoot should append .minigit to " << root << '\n';
+        return false;
+    }
+    return true;
+}
+
+
+bool checkHeadAndIndexPaths(const std::filesystem::path &root)
+{
+    const minigit::RepositoryPaths paths(root);
+
+    if (paths.headFile() != root / ".minigit" / "HEAD")
+    {
+        std::cerr << "FAILED: headFile should be " << root / ".minigit" / "HEAD" << '\n';
+        return false;
+    }
+    if (paths.indexFile() != root / ".minigit" / "index.txt")
+    {
+        std::cerr << "FAILED: indexFile should be " << root / ".minigit" / "index.txt" << '\n';
         return false;
     }
     return true;
@@ -141,12 +161,15 @@ bool checkSafeRelativeFiles(const std::filesystem::path &root)
         const char *argument;
         const char *expected;
     };
+
     const AcceptedCase accepted[] = {
         {"notes.txt", "notes.txt"},
         {"docs/notes.txt", "docs/notes.txt"},
         {"docs/./notes.txt", "docs/notes.txt"},
         {"docs/../notes.txt", "notes.txt"},
-        {"my..notes.txt", "my..notes.txt"}};
+        {"my..notes.txt", "my..notes.txt"}
+    };
+
     for (const auto &test : accepted)
     {
         if (!checkAccepted(paths, test.argument, test.expected))
@@ -159,6 +182,7 @@ bool checkSafeRelativeFiles(const std::filesystem::path &root)
         "", ".", "/notes.txt", "../notes.txt", "docs/../../notes.txt",
         ".minigit/HEAD", ".git/config", "docs/.minigit/x", "docs/..",
         ".git/../notes.txt", ".minigit/../notes.txt"};
+
     for (const auto *argument : rejected)
     {
         if (!checkRejected(paths, argument))
@@ -168,11 +192,11 @@ bool checkSafeRelativeFiles(const std::filesystem::path &root)
     }
 
 #ifdef _WIN32
-    // Windows supports drive roots and backslash separators as well.
     if (!checkAccepted(paths, "docs\\notes.txt", "docs/notes.txt"))
     {
         passed = false;
     }
+
     const char *windowsRejected[] = {"C:\\notes.txt", "C:notes.txt", "\\notes.txt"};
     for (const auto *argument : windowsRejected)
     {
@@ -191,7 +215,14 @@ int main()
     const auto normalRoot = std::filesystem::path("course") / "repo";
     const auto nestedRoot = std::filesystem::path("course") / "team" / "repo";
 
+    if (!checkRoots(normalRoot) || !checkRoots(nestedRoot)
+        || !checkStageFile(normalRoot) || !checkStageFile(nestedRoot))
+    {
+        return 1;
+    }
+
     bool passed = checkRoots(normalRoot) && checkRoots(nestedRoot)
+        && checkHeadAndIndexPaths(normalRoot) && checkHeadAndIndexPaths(nestedRoot)
         && checkStageFile(normalRoot) && checkStageFile(nestedRoot)
         && checkCommitDirectory(normalRoot) && checkCommitDirectory(nestedRoot)
         && checkCommittedFile(normalRoot) && checkCommittedFile(nestedRoot)
@@ -201,5 +232,6 @@ int main()
     {
         std::cout << "RepositoryPaths checks passed\n";
     }
+
     return passed ? 0 : 1;
 }
