@@ -34,7 +34,7 @@ std::filesystem::path RepositoryPaths::indexFile() const
 
 std::filesystem::path RepositoryPaths::stageFile(const std::string &path) const
 {
-    return metadataRoot_ / "stage" / safeRelativeFile(path);
+    return metadataRoot_ / "stage" / path;
 }
 
 std::filesystem::path RepositoryPaths::commitDirectory(const std::string &id) const
