@@ -10,9 +10,10 @@ int main() {
 
     try {
         const auto originalDirectory = fs::current_path();
+        const auto tempRoot = fs::absolute(fs::temp_directory_path());
         TestDirectory directory;
         std::error_code error;
-        if (!directory.create(fs::temp_directory_path(), "minigit-filesystem-test", error)) {
+        if (!directory.create(tempRoot, "minigit-filesystem-test", error)) {
             std::cerr << "FAILED: could not create test directory: " << error.message() << '\n';
             return 1;
         }
