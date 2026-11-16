@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(minigit_paths src/PathLab.cpp src/RepositoryPaths.cpp src/FileSystem.cpp)
+target_sources(minigit_paths PRIVATE src/ReadIndex.cpp)
 target_include_directories(minigit_paths PUBLIC include)
 
 include(CTest)
@@ -18,6 +19,10 @@ if(BUILD_TESTING)
     target_link_libraries(read_failure_tests PRIVATE minigit_paths)
     target_include_directories(read_failure_tests PRIVATE src)
     add_test(NAME read_failure_tests COMMAND read_failure_tests)
+
+    add_executable(read_index_tests tests/ReadIndexTests.cpp)
+    target_link_libraries(read_index_tests PRIVATE minigit_paths)
+    add_test(NAME read_index_tests COMMAND read_index_tests)
 
     # Keep the Issue 3 writing and directory-isolation regression checks.
     add_executable(issue3_tests tests/Issue3Tests.cpp)
