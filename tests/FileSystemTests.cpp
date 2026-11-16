@@ -48,14 +48,14 @@ int main() {
             }
             return 1;
         }
-        // FS-2: Test reading an empty file.
-        const auto emptyFile = directory.path() / "empty.txt";
+            // FS-2: Test reading an empty file.
+            const auto emptyFile = directory.path() / "empty.txt";
 
-        const auto emptyWritten = fileSystem.writeTextFile(emptyFile, "");
+            const auto emptyWritten = fileSystem.writeTextFile(emptyFile, "");
 
-        if (!emptyWritten.ok) {
-            std::cerr << "FAILED: could not create empty file\n";
-            return 1;
+            if (!emptyWritten.ok) {
+                std::cerr << "FAILED: could not create empty file\n";
+                return 1;
         }
 
         const auto emptyRead = fileSystem.readTextFile(emptyFile);
