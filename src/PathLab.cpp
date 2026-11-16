@@ -12,7 +12,9 @@ std::filesystem::path metadataDirectory(const std::filesystem::path& root) {
 std::filesystem::path headPath(const std::filesystem::path& root) {
     return metadataDirectory(root) / "HEAD";
 }
-
+// FS-2 (#46): These functions were moved to the FileSystem class.
+// The original implementation is kept here temporarily for reference.
+/*
 WriteResult writeTextFile(const std::filesystem::path& filePath,
                           const std::string& text) {
     const std::filesystem::path parent = filePath.parent_path();
@@ -74,5 +76,5 @@ ReadResult readTextFile(const std::filesystem::path& filePath) {
     }
     return detail::readTextStream(input, filePath);
 }
-
+*/
 } // namespace minigit
