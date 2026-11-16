@@ -73,11 +73,81 @@ int main() {
             std::cerr << "FAILED: missing file should return an error\n";
             return 1;
         }
+        // FS-3: Test copying a regular file.
+        const auto source = directory.path() / "original.txt";
+        const auto targetFolder = directory.path() / "backup";
+        const auto target = targetFolder / "original.txt";
+
+        fs::create_directories(targetFolder);
+
+        const auto sourceWritten = fileSystem.writeTextFile(source, "hello\n");
+
+        if (!sourceWritten.ok) {
+            std::cerr << "FAILED: could not create source file\n";
+            return 1;
+        }
+
+        fileSystem.copy(source, target);
+
+        const auto sourceRead = fileSystem.readTextFile(source);
+        const auto targetRead = fileSystem.readTextFile(target);
+
+        if (!sourceRead.ok || !targetRead.ok ||
+            sourceRead.text != "hello\n" ||
+            targetRead.text != sourceRead.text) {
+            std::cerr << "FAILED: copied file contents do not match\n";
+            return 1;
+        }
+
+        // FS-3: Test copying a missing source file.
+        const auto missingSource = directory.path() / "missingSource.txt";
+        const auto missingTarget = targetFolder / "missingCopy.txt";
+
+        bool exceptionThrown = false;
+
+        try {
+            fileSystem.copy(missingSource, missingTarget);
+        } catch (const fs::filesystem_error&) {
+            exceptionThrown = true;
+        }
+
+        if (!exceptionThrown || fs::exists(missingTarget)) {
+            std::cerr << "FAILED: copying a missing file should throw an exception\n";
+            return 1;
+        }
+
+        // FS-3: Test copying over an existing target.
+        const auto existingTarget = targetFolder / "existing.txt";
+
+        const auto existingWritten = fileSystem.writeTextFile(existingTarget, "original content");
+
+        if (!existingWritten.ok) {
+            std::cerr << "FAILED: could not create existing target\n";
+            return 1;
+        }
+
+        bool overwriteException = false;
+
+        try {
+            fileSystem.copy(source, existingTarget);
+        } catch (const fs::filesystem_error&) {
+            overwriteException = true;
+        }
+
+        const auto existingRead = fileSystem.readTextFile(existingTarget);
+
+        if (!overwriteException || !existingRead.ok ||
+            existingRead.text != "original content") {
+            std::cerr << "FAILED: existing target should not be overwritten\n";
+            return 1;
+        }
 
         if (!directory.cleanup(error)) {
             std::cerr << "FAILED: could not clean up test directory: " << error.message() << '\n';
             return 1;
         }
+
+
     } catch (const fs::filesystem_error& error) {
         std::cerr << "FAILED: " << error.what() << '\n';
         return 1;
