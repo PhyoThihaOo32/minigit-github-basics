@@ -24,8 +24,8 @@ namespace minigit {
         std::vector<std::string> readIndex(std::filesystem::path& indexPath) const;
 
         WriteResult writeTextFile(const std::filesystem::path& filePath,const std::string& text) const;
-        
         ReadResult readTextFile(const std::filesystem::path& filePath) const;
-    };
 
+        void copy(const std::filesystem::path& source,const std::filesystem::path& target) const;
+    };
 } // namespace minigit

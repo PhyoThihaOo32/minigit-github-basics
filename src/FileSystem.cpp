@@ -6,7 +6,7 @@
 namespace minigit {
 
     FileSystem::FileSystem() = default;
-    
+
     WriteResult FileSystem::writeTextFile( const std::filesystem::path& filePath,const std::string& text) const {
         const std::filesystem::path parent = filePath.parent_path();
 
@@ -75,6 +75,10 @@ namespace minigit {
         }
 
         return detail::readTextStream(input, filePath);
-    
+    }
+    // FS-3: Copy a regular file.
+    void FileSystem::copy(const std::filesystem::path& source,const std::filesystem::path& target) const
+    {
+        std::filesystem::copy_file(source, target);
     }
 } // namespace minigit
