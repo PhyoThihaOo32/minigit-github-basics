@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace minigit {
 
@@ -18,6 +19,9 @@ namespace minigit {
     class FileSystem {
     public:
         FileSystem();
+
+        // Read one index entry per line. Throw std::runtime_error if reading fails.
+        std::vector<std::string> readIndex(std::filesystem::path& indexPath) const;
 
         WriteResult writeTextFile(const std::filesystem::path& filePath,const std::string& text) const;
         
