@@ -30,24 +30,24 @@ int main() {
         }
         if (!empty) {
             std::cerr << "FAILED: FileSystem construction should leave the directory empty\n";
-            // FS-2: Test writing and reading a file inside a missing subdirectory.
-            const auto filePath = directory.path() / "nested" / "notes.txt";
-
-            const auto written = fileSystem.writeTextFile(filePath, "hello\n");
-
-            if (!written.ok) {
-                std::cerr << "FAILED: could not write file\n";
-                return 1;
-            }
-
-            const auto read = fileSystem.readTextFile(filePath);
-
-            if (!read.ok || read.text != "hello\n") {
-                std::cerr << "FAILED: file contents do not match\n";
-                return 1;
-            }
             return 1;
         }
+        // FS-2: Test writing and reading a file inside a missing subdirectory.
+        const auto filePath = directory.path() / "nested" / "notes.txt";
+
+        const auto written = fileSystem.writeTextFile(filePath, "hello\n");
+
+        if (!written.ok) {
+            std::cerr << "FAILED: could not write file\n";
+            return 1;
+        }
+
+        const auto read = fileSystem.readTextFile(filePath);
+
+        if (!read.ok || read.text != "hello\n") {
+            std::cerr << "FAILED: file contents do not match\n";
+            return 1;
+            }
         // FS-2: Test reading an empty file.
         const auto emptyFile = directory.path() / "empty.txt";
 
