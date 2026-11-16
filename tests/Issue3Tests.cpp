@@ -1,4 +1,5 @@
 #include "PathLab.hpp"
+#include "FileSystem.hpp"
 #include <iostream>
 #include <filesystem>
 #include <string>
@@ -40,8 +41,9 @@ bool createTestDirectory(const std::filesystem::path& parent,
 // This function does not own tempFolder. Returning on failure is safe because
 // main cleans it up after this function (and its file stream) have returned.
 bool testWriteTextFile(const std::filesystem::path& tempFolder) {
+    const minigit::FileSystem fileSystem;
     const auto filePath = tempFolder / "nested" / "notes.txt";
-    const auto written = minigit::writeTextFile(filePath, "Hello, world!");
+    const auto written = fileSystem.writeTextFile(filePath, "Hello, world!");
     if (!check(written.ok && written.error.empty(),
                "writeTextFile should write to the file")) {
         std::cerr << written.error << '\n';
@@ -60,9 +62,10 @@ bool testWriteTextFile(const std::filesystem::path& tempFolder) {
 // Force a collision and keep two claimed directories alive at the same time.
 // All fixtures live inside this run's owned directory, not the shared temp root.
 bool testDirectoryIsolation(const std::filesystem::path& tempFolder) {
+    const minigit::FileSystem fileSystem;
     const auto existingDirectory = tempFolder / "collision-0";
     const auto sentinelPath = existingDirectory / "keep.txt";
-    const auto written = minigit::writeTextFile(sentinelPath, "keep me");
+    const auto written = fileSystem.writeTextFile(sentinelPath, "keep me");
     if (!check(written.ok && written.error.empty(),
                "the existing-directory fixture should be created")) {
         std::cerr << written.error << '\n';

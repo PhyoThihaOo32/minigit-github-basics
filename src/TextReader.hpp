@@ -1,5 +1,5 @@
 #pragma once
-#include "PathLab.hpp"
+#include "FileSystem.hpp"
 #include <istream>
 
 namespace minigit::detail {

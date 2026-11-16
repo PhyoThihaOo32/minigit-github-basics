@@ -1,4 +1,5 @@
 #include "PathLab.hpp"
+#include "FileSystem.hpp"
 #include "TestDirectory.hpp"
 #include <chrono>
 #include <fstream>
@@ -27,9 +28,10 @@ bool testPaths() {
 }
 
 bool testWriting(const std::filesystem::path& root) {
+    const minigit::FileSystem fileSystem;
     const auto nestedFile = root / "a" / "b" / "c" / "note.txt";
     const std::string expected = "hello minigit\n";
-    const auto written = minigit::writeTextFile(nestedFile, expected);
+    const auto written = fileSystem.writeTextFile(nestedFile, expected);
     if (!check(written.ok && written.error.empty(), "nested writing should succeed")) {
         return false;
     }
@@ -44,44 +46,45 @@ bool testWriting(const std::filesystem::path& root) {
     }
 
     const auto blocker = root / "blocker";
-    if (!check(minigit::writeTextFile(blocker, "not a folder").ok,
+    if (!check(fileSystem.writeTextFile(blocker, "not a folder").ok,
                "the invalid-parent fixture should be created")) {
         return false;
     }
-    const auto blocked = minigit::writeTextFile(blocker / "child.txt", expected);
+    const auto blocked = fileSystem.writeTextFile(blocker / "child.txt", expected);
     return check(!blocked.ok && !blocked.error.empty(),
                  "writing below a regular file should return an error");
 }
 
 bool testReading(const std::filesystem::path& root) {
+    const minigit::FileSystem fileSystem;
     const auto file = root / "notes" / "hello.txt";
     const std::string expected = " first line\n\nsecond line without a final newline";
-    if (!check(minigit::writeTextFile(file, expected).ok,
+    if (!check(fileSystem.writeTextFile(file, expected).ok,
                "the writer should create the file used by the reader")) {
         return false;
     }
-    const auto read = minigit::readTextFile(file);
+    const auto read = fileSystem.readTextFile(file);
     if (!check(read.ok && read.text == expected && read.error.empty(),
                "reading should preserve spaces, blank lines, and the final character")) {
         return false;
     }
 
-    const auto missing = minigit::readTextFile(root / "missing.txt");
+    const auto missing = fileSystem.readTextFile(root / "missing.txt");
     if (!check(!missing.ok && missing.text.empty() && !missing.error.empty(),
                "a missing file should return an error without partial text")) {
         return false;
     }
-    const auto folder = minigit::readTextFile(file.parent_path());
+    const auto folder = fileSystem.readTextFile(file.parent_path());
     if (!check(!folder.ok && folder.text.empty() && !folder.error.empty(),
                "a directory should not be read as a text file")) {
         return false;
     }
 
     const auto emptyPath = root / "empty.txt";
-    if (!check(minigit::writeTextFile(emptyPath, "").ok, "an empty file should be created")) {
+    if (!check(fileSystem.writeTextFile(emptyPath, "").ok, "an empty file should be created")) {
         return false;
     }
-    const auto empty = minigit::readTextFile(emptyPath);
+    const auto empty = fileSystem.readTextFile(emptyPath);
     return check(empty.ok && empty.text.empty() && empty.error.empty(),
                  "an empty file should be a successful read");
 }
@@ -90,20 +93,22 @@ bool testReading(const std::filesystem::path& root) {
 // remove its own files before control returns to the caller.
 bool simulateFailedCheck(const std::filesystem::path& parent,
                          std::filesystem::path& createdPath) {
+    const minigit::FileSystem fileSystem;
     TestDirectory directory;
     std::error_code error;
     if (!directory.create(parent, "failed-check", error)) {
         return false;
     }
     createdPath = directory.path();
-    minigit::writeTextFile(createdPath / "fixture.txt", "test data");
+    fileSystem.writeTextFile(createdPath / "fixture.txt", "test data");
     return false;
 }
 
 bool testDirectoryOwnership(const std::filesystem::path& root) {
+    const minigit::FileSystem fileSystem;
     const auto existing = root / "candidate-0";
     const auto sentinel = existing / "keep.txt";
-    if (!check(minigit::writeTextFile(sentinel, "keep me").ok,
+    if (!check(fileSystem.writeTextFile(sentinel, "keep me").ok,
                "an existing candidate fixture should be created")) {
         return false;
     }
@@ -124,7 +129,7 @@ bool testDirectoryOwnership(const std::filesystem::path& root) {
         return false;
     }
     const bool secondExists = std::filesystem::exists(second.path(), error);
-    const auto preserved = minigit::readTextFile(sentinel);
+    const auto preserved = fileSystem.readTextFile(sentinel);
     if (!check(secondExists && !error && preserved.ok && preserved.text == "keep me",
                "cleanup should preserve another run and an existing sentinel")) {
         return false;
