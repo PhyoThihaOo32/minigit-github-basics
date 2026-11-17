@@ -150,5 +150,4 @@ bool FileSystem::updateHEAD(std::filesystem::path& headpath,
             }
         }
         return true;
-} 
-// namespace minigit
+} // namespace minigit
