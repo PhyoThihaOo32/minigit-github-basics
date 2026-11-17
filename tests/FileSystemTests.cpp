@@ -77,6 +77,39 @@ bool checkInspectionAndStage(const std::filesystem::path& root) {
         return false;
     }
 
+    const auto stageRoot = root / ".minigit" / "stage";
+    const auto externalFile = root / "outside" / "linked.txt";
+    if (!writeFixture(externalFile, "outside file")) {
+        std::cerr << "FAILED: could not create symbolic-link target\n";
+        return false;
+    }
+
+    std::error_code linkError;
+    const auto fileLink = stageRoot / "work" / "file-link.txt";
+    fs::create_symlink(externalFile, fileLink, linkError);
+    if (!linkError) {
+        std::vector<fs::path> linkedFilePaths{fileLink};
+        std::vector<std::string> linkedFileSelection{"work/file-link.txt"};
+        if (fileSystem.checkStage(linkedFilePaths, linkedFileSelection)) {
+            std::cerr << "FAILED: a staged file symlink should not pass checkStage\n";
+            return false;
+        }
+    }
+
+    linkError.clear();
+    const auto externalDirectory = root / "outside";
+    const auto directoryLink = stageRoot / "linked-directory";
+    fs::create_directory_symlink(externalDirectory, directoryLink, linkError);
+    if (!linkError) {
+        const auto linkedChild = directoryLink / "linked.txt";
+        std::vector<fs::path> linkedDirectoryPaths{linkedChild};
+        std::vector<std::string> linkedDirectorySelection{"linked-directory/linked.txt"};
+        if (fileSystem.checkStage(linkedDirectoryPaths, linkedDirectorySelection)) {
+            std::cerr << "FAILED: a symlinked staged directory should not pass checkStage\n";
+            return false;
+        }
+    }
+
     std::string contents;
     if (!readFixture(existing, contents) || contents != "working copy"
         || !readFixture(staged, contents) || contents != "staged copy"

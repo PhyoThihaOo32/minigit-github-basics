@@ -240,10 +240,41 @@ namespace minigit {
         }
 
         for (std::size_t i = 0; i < selectedPaths.size(); ++i) {
-            std::error_code error;
-            const auto status = std::filesystem::status(paths[i], error);
-            if (error || !std::filesystem::is_regular_file(status)) {
+            namespace fs = std::filesystem;
+            const fs::path relative = fs::path(selectedPaths[i]).lexically_normal();
+            if (relative.empty() || relative == "." || relative.has_root_path()
+                || *relative.begin() == "..") {
                 return false;
+            }
+
+            const fs::path stagedFile = paths[i].lexically_normal();
+            fs::path stageRoot = stagedFile;
+            for ([[maybe_unused]] const auto& part : relative) {
+                stageRoot = stageRoot.parent_path();
+            }
+            if ((stageRoot / relative).lexically_normal() != stagedFile) {
+                return false;
+            }
+
+            std::error_code error;
+            const auto rootStatus = fs::symlink_status(stageRoot, error);
+            if (error || fs::is_symlink(rootStatus) || !fs::is_directory(rootStatus)) {
+                return false;
+            }
+
+            // Match clearStage: walk each selected component without following links.
+            fs::path current = stageRoot;
+            for (const auto& part : relative) {
+                current /= part;
+                const auto status = fs::symlink_status(current, error);
+                if (error || fs::is_symlink(status)) {
+                    return false;
+                }
+
+                const bool isFinalPart = current == stagedFile;
+                if (isFinalPart ? !fs::is_regular_file(status) : !fs::is_directory(status)) {
+                    return false;
+                }
             }
         }
         return true;
