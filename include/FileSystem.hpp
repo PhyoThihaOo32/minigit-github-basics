@@ -32,6 +32,17 @@ namespace minigit {
         bool updateHEAD(std::filesystem::path& headpath,std::string& newID) const;
         // FS-6: Clear the stage of selected files. Return true if successful, false otherwise.
         bool clearStage(std::vector<std::string>& selectedPaths,std::filesystem::path& stagePath, std::filesystem::path& indexPath) const;
+
+        // Each paths[i] is the filesystem location for selectedPaths[i].
+        // Replaces results with one "present", "missing", or "could not inspect" status per selection.
+        void inespectFiles(const std::vector<std::filesystem::path>& paths,
+                           const std::vector<std::string>& selectedPaths,
+                           std::vector<std::string>& results) const;
+
+        // Here paths contains staged file locations in the same order as selectedPaths.
+        // Returns false for an empty selection, a missing/non-file entry, or an inspection error.
+        bool checkStage(const std::vector<std::filesystem::path>& paths,
+                        const std::vector<std::string>& selectedPaths) const;
         
     };
 } // namespace minigit

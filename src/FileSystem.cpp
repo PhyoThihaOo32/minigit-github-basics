@@ -208,4 +208,76 @@ namespace minigit {
 
         return true;
     }
+    void FileSystem::inespectFiles(const std::vector<std::filesystem::path>& paths,
+                                   const std::vector<std::string>& selectedPaths,
+                                   std::vector<std::string>& results) const {
+        results.clear();
+        results.reserve(selectedPaths.size());
+
+        for (std::size_t i = 0; i < selectedPaths.size(); ++i) {
+            if (i >= paths.size()) {
+                results.push_back("could not inspect: " + selectedPaths[i]);
+                continue;
+            }
+
+            std::error_code error;
+            const auto status = std::filesystem::status(paths[i], error);
+            if (error == std::errc::no_such_file_or_directory
+                || error == std::errc::not_a_directory
+                || (!error && !std::filesystem::exists(status))) {
+                results.push_back("missing: " + selectedPaths[i]);
+            } else if (!error && std::filesystem::is_regular_file(status)) {
+                results.push_back("present: " + selectedPaths[i]);
+            } else {
+                results.push_back("could not inspect: " + selectedPaths[i]);
+            }
+        }
+    }
+
+    bool FileSystem::checkStage(const std::vector<std::filesystem::path>& paths,
+                                const std::vector<std::string>& selectedPaths) const {
+        if (selectedPaths.empty() || paths.size() < selectedPaths.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < selectedPaths.size(); ++i) {
+            namespace fs = std::filesystem;
+            const fs::path relative = fs::path(selectedPaths[i]).lexically_normal();
+            if (relative.empty() || relative == "." || relative.has_root_path()
+                || *relative.begin() == "..") {
+                return false;
+            }
+
+            const fs::path stagedFile = paths[i].lexically_normal();
+            fs::path stageRoot = stagedFile;
+            for ([[maybe_unused]] const auto& part : relative) {
+                stageRoot = stageRoot.parent_path();
+            }
+            if ((stageRoot / relative).lexically_normal() != stagedFile) {
+                return false;
+            }
+
+            std::error_code error;
+            const auto rootStatus = fs::symlink_status(stageRoot, error);
+            if (error || fs::is_symlink(rootStatus) || !fs::is_directory(rootStatus)) {
+                return false;
+            }
+
+            // Match clearStage: walk each selected component without following links.
+            fs::path current = stageRoot;
+            for (const auto& part : relative) {
+                current /= part;
+                const auto status = fs::symlink_status(current, error);
+                if (error || fs::is_symlink(status)) {
+                    return false;
+                }
+
+                const bool isFinalPart = current == stagedFile;
+                if (isFinalPart ? !fs::is_regular_file(status) : !fs::is_directory(status)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 }// namespace minigit
