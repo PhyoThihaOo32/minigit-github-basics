@@ -142,9 +142,15 @@ int main() {
             return 1;
         }
 
-       auto headPath = directory.path() / "HEAD";
-        if (!fileSystem.writeTextFile(headPath, "old-id").ok) {
-            std::cerr << "FAILED: could not create HEAD\n";
+        auto headPath = directory.path() / "HEAD";
+        const auto legacyTemp = directory.path() / "HEAD.tmp";
+        const auto occupiedScratch = directory.path() / ".minigit-head-update-0";
+        const auto sentinel = occupiedScratch / "keep.txt";
+
+        if (!fileSystem.writeTextFile(headPath, "old-id").ok ||
+            !fileSystem.writeTextFile(legacyTemp, "existing file").ok ||
+            !fileSystem.writeTextFile(sentinel, "owned by another update").ok) {
+            std::cerr << "FAILED: could not create HEAD update fixtures\n";
             return 1;
         }
 
@@ -155,6 +161,16 @@ int main() {
             std::cerr << "FAILED: updateHEAD should replace the old ID\n";
             return 1;
         }
+
+        const auto preservedTemp = fileSystem.readTextFile(legacyTemp);
+        const auto preservedSentinel = fileSystem.readTextFile(sentinel);
+        if (!preservedTemp.ok || preservedTemp.text != "existing file" ||
+            !preservedSentinel.ok || preservedSentinel.text != "owned by another update" ||
+            fs::exists(directory.path() / ".minigit-head-update-1")) {
+            std::cerr << "FAILED: updateHEAD should clean up only its own temporary files\n";
+            return 1;
+        }
+
 
        
         auto headDirectory = directory.path() / "headDir";

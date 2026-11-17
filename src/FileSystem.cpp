@@ -84,7 +84,7 @@ namespace minigit {
         std::filesystem::copy_file(source, target);
     }
 
-    // FS-6: Remove the staged copies that were saved in a checkpoint.
+    // Replace HEAD after the new ID has been written successfully.
     bool FileSystem::updateHEAD(std::filesystem::path& headpath, std::string& newID) const
     {
         namespace fs = std::filesystem;
@@ -105,28 +105,37 @@ namespace minigit {
             return false;
         }
 
-        fs::path tempPath = headpath;
-        tempPath += ".tmp";
-
-        const auto tempStatus = fs::symlink_status(tempPath, error);
-        if (tempStatus.type() != fs::file_type::not_found) {
-            return false;
-        }
-        error.clear();
-
-        if (!writeTextFile(tempPath, newID).ok) {
-            fs::remove(tempPath, error);
-            return false;
-        }
-
-        fs::rename(tempPath, headpath, error);
+        const auto parent = headpath.has_parent_path() ? headpath.parent_path() : fs::path(".");
+        fs::create_directories(parent, error);
         if (error) {
-            std::error_code ignored;
-            fs::remove(tempPath, ignored);
             return false;
         }
 
-        return true;
+        // Claim a directory beside HEAD so the replacement stays on the same filesystem.
+        for (int attempt = 0; attempt < 100; ++attempt) {
+            const auto scratch = parent / (".minigit-head-update-" + std::to_string(attempt));
+            if (!fs::create_directory(scratch, error)) {
+                if (error && error != std::errc::file_exists) {
+                    return false;
+                }
+                continue;
+            }
+
+            const auto replacement = scratch / "replacement";
+            const bool written = writeTextFile(replacement, newID).ok;
+            if (written) {
+                fs::rename(replacement, headpath, error);
+            }
+            const bool updated = written && !error;
+
+            std::error_code cleanupError;
+            if (!updated) {
+                fs::remove(replacement, cleanupError);
+            }
+            fs::remove(scratch, cleanupError);
+            return updated;
+        }
+        return false;
     }
     
     bool FileSystem::clearStage(std::vector<std::string>& selectedPaths, std::filesystem::path& stagePath, std::filesystem::path& indexPath) const
