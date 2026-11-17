@@ -28,8 +28,10 @@ namespace minigit {
 
         void copy(const std::filesystem::path& source,const std::filesystem::path& target) const;
 
-        // Delete a file or directory. If the path is a directory, delete it recursively.
+        // FS-6: Update Head file with new commit ID. Return true if successful, false otherwise.
         bool updateHEAD(std::filesystem::path& headpath,std::string& newID) const;
+        // FS-6: Clear the stage of selected files. Return true if successful, false otherwise.
         bool clearStage(std::vector<std::string>& selectedPaths,std::filesystem::path& stagePath, std::filesystem::path& indexPath) const;
+        
     };
 } // namespace minigit

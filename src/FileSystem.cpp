@@ -83,8 +83,7 @@ namespace minigit {
     }
 
     // FS - 6: Update Head file with new commit ID. Return true if successful, false otherwise.
-    bool FileSystem::updateHEAD(std::filesystem::path& headpath,
-                                std::string& newID) const
+    bool FileSystem::updateHEAD(std::filesystem::path& headpath, std::string& newID) const
     {
         std::error_code error;
         if (std::filesystem::is_directory(headpath, error)) {
@@ -96,14 +95,52 @@ namespace minigit {
     }
 
     // FS-6: Remove the staged copies that were saved in a checkpoint.
-    bool FileSystem::clearStage(std::vector<std::string>& selectedPaths,
-                                std::filesystem::path& stagePath,
-                                std::filesystem::path& indexPath) const
+    bool FileSystem::updateHEAD(std::filesystem::path& headpath, std::string& newID) const
     {
         namespace fs = std::filesystem;
         std::error_code error;
 
-        if (!fs::is_directory(stagePath, error) || error) {
+         if (headpath.empty()) {
+            return false;
+        }
+
+        const auto status = fs::symlink_status(headpath, error);
+        if (error && status.type() != fs::file_type::not_found) {
+            return false;
+        }
+        if (fs::is_symlink(status) || fs::is_directory(status)) {
+            return false;
+        }
+        if (fs::exists(status) && !fs::is_regular_file(status)) {
+            return false;
+        }
+
+        fs::path tempPath = headpath;
+        tempPath += ".tmp";
+
+        if (!writeTextFile(tempPath, newID).ok) {
+            fs::remove(tempPath, error);
+            return false;
+        }
+
+        fs::rename(tempPath, headpath, error);
+        if (error) {
+            std::error_code ignored;
+            fs::remove(tempPath, ignored);
+            return false;
+        }
+
+        return true;
+    }
+    
+    bool FileSystem::clearStage(std::vector<std::string>& selectedPaths, std::filesystem::path& stagePath, std::filesystem::path& indexPath) const
+    {
+        namespace fs = std::filesystem;
+        std::error_code error;
+
+        // The stage itself must be a real directory, not a link to somewhere else.
+        const auto stageStatus = fs::symlink_status(stagePath, error);
+        if (error || !fs::is_directory(stageStatus)) {
             return false;
         }
 
@@ -116,39 +153,51 @@ namespace minigit {
             return false;
         }
 
-        // Validate every path before deleting anything, so a bad entry doesn't leave the stage in a half-cleared state.
+        // Validate every path before deleting anything, so a bad entry doesn't leave the stage in a partially cleared state.
         std::vector<fs::path> targets;
         for (const auto& selected : selectedPaths) {
             if (selected.empty()) {
                 return false;
             }
 
-            const fs::path target = fs::weakly_canonical(stageRoot / selected, error);
-            if (error) {
+            const fs::path relative = fs::path(selected).lexically_normal();
+
+            // Must be a relative path that stays inside the stage.
+            if (relative.has_root_path() || relative.empty() ||
+                relative == "." || *relative.begin() == "..") {
                 return false;
             }
 
-            // The target must sit strictly inside the stage directory.
-            const fs::path relative = target.lexically_relative(stageRoot);
-            if (relative.empty() || relative == "." ||
-                *relative.begin() == "..") {
+            // Walk each component so no directory or file along the way is a symbolic link that could point outside the stage.
+            fs::path current = stageRoot;
+            for (const auto& part : relative) {
+                current /= part;
+                const auto partStatus = fs::symlink_status(current, error);
+                if (error || fs::is_symlink(partStatus)) {
+                    return false;
+                }
+            }
+
+            // Only plain files may be cleared
+            if (!fs::is_regular_file(fs::symlink_status(current, error)) || error) {
                 return false;
             }
 
-            // Never delete the index, even if it lives inside the stage.
-            if (target == indexFile) {
+            // Never delete the index
+            if (fs::equivalent(current, indexFile, error) || current == indexFile) {
                 return false;
             }
+            error.clear();
 
-            targets.push_back(target);
+            targets.push_back(current);
         }
-
+        //Delete files after validation
         for (const auto& target : targets) {
-            fs::remove_all(target, error);
-            if (error) {
+            if (!fs::remove(target, error) || error) {
                 return false;
             }
         }
+
         return true;
-    } 
+    }
 }// namespace minigit

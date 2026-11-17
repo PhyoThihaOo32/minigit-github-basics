@@ -143,50 +143,104 @@ int main() {
             return 1;
         }
 
-                // FS-6: Test a selected path outside the stage directory.
+        // FS-6: Test a selected path outside the stage directory.
+       auto headPath = directory.path() / "HEAD";
+        if (!fileSystem.writeTextFile(headPath, "old-id").ok) {
+            std::cerr << "FAILED: could not create HEAD\n";
+            return 1;
+        }
+
+        std::string newID = "new-id";
+        const bool headUpdated = fileSystem.updateHEAD(headPath, newID);
+        const auto headRead = fileSystem.readTextFile(headPath);
+        if (!headUpdated || !headRead.ok || headRead.text != "new-id") {
+            std::cerr << "FAILED: updateHEAD should replace the old ID\n";
+            return 1;
+        }
+
+        // FS-6: Test that a directory HEAD path is rejected.
+        auto headDirectory = directory.path() / "headDir";
+        fs::create_directories(headDirectory);
+        if (fileSystem.updateHEAD(headDirectory, newID) || !fs::is_directory(headDirectory)) {
+            std::cerr << "FAILED: updateHEAD should return false for a directory\n";
+            return 1;
+        }
+
+        // FS-6 setup: a stage with two staged copies, a working copy and an index.
         auto stagePath = directory.path() / "stage";
         auto indexPath = directory.path() / "index.txt";
-        const auto selectedPath = directory.path() / "outside.txt";
+        const auto selectedStaged = stagePath / "a.txt";
+        const auto unselectedStaged = stagePath / "b.txt";
+        const auto workingCopy = directory.path() / "a.txt";
+        const std::string indexContents = "a.txt\nb.txt\n";
 
-        fs::create_directories(stagePath);
+        if (!fileSystem.writeTextFile(selectedStaged, "staged a").ok ||
+            !fileSystem.writeTextFile(unselectedStaged, "staged b").ok ||
+            !fileSystem.writeTextFile(workingCopy, "working a").ok ||
+            !fileSystem.writeTextFile(indexPath, indexContents).ok) {
+            std::cerr << "FAILED: could not create stage files\n";
+            return 1;
+        }
 
-        if (!fileSystem.writeTextFile(selectedPath, "content").ok) {
+        // FS-6: Test clearing one selected staged file.
+        std::vector<std::string> toClear = {"a.txt"};
+        if (!fileSystem.clearStage(toClear, stagePath, indexPath)) {
+            std::cerr << "FAILED: clearStage should succeed for a staged file\n";
+            return 1;
+        }
+
+        const auto unselectedRead = fileSystem.readTextFile(unselectedStaged);
+        const auto workingRead = fileSystem.readTextFile(workingCopy);
+        const auto indexRead = fileSystem.readTextFile(indexPath);
+
+        if (fs::exists(selectedStaged) ||
+            !unselectedRead.ok || unselectedRead.text != "staged b" ||
+            !workingRead.ok || workingRead.text != "working a" ||
+            !indexRead.ok || indexRead.text != indexContents) {
+            std::cerr << "FAILED: clearStage should remove only the selected staged file\n";
+            return 1;
+        }
+
+        // FS-6: Test a selected path outside the stage directory.
+        const auto outsidePath = directory.path() / "outside.txt";
+        if (!fileSystem.writeTextFile(outsidePath, "content").ok) {
             std::cerr << "FAILED: could not create outside file\n";
             return 1;
         }
 
-        std::vector<std::string> selectedPaths = {selectedPath.string()};
-        if (fileSystem.clearStage(selectedPaths, stagePath, indexPath) ||
-            !fs::exists(selectedPath)) {
+        std::vector<std::string> outsideSelection = {(fs::path("..") / "outside.txt").string()};
+        std::vector<std::string> absoluteSelection = {outsidePath.string()};
+        if (fileSystem.clearStage(outsideSelection, stagePath, indexPath) ||
+            fileSystem.clearStage(absoluteSelection, stagePath, indexPath) ||
+            !fs::exists(outsidePath)) {
             std::cerr << "FAILED: clearStage should return false for a path outside the stage directory\n";
             return 1;
         }
 
-        // FS-6: Test clearing staged files while keeping the index.
-        auto stagedFile = stagePath / "a.txt";
-        auto stagedNested = stagePath / "dir" / "b.txt";
+        // FS-6: Test that selecting a directory is rejected and nothing is deleted.
+        const auto nestedStaged = stagePath / "dir" / "c.txt";
+        if (!fileSystem.writeTextFile(nestedStaged, "staged c").ok) {
+            std::cerr << "FAILED: could not create nested staged file\n";
+            return 1;
+        }
+
+        std::vector<std::string> directorySelection = {"dir"};
+        if (fileSystem.clearStage(directorySelection, stagePath, indexPath) ||
+            !fs::exists(nestedStaged)) {
+            std::cerr << "FAILED: clearStage should reject a directory selection\n";
+            return 1;
+        }
+
+        // FS-6: Test that the index can never be cleared, even inside the stage.
         auto innerIndex = stagePath / "index.txt";
-
-        if (!fileSystem.writeTextFile(stagedFile, "a").ok ||
-            !fileSystem.writeTextFile(stagedNested, "b").ok ||
-            !fileSystem.writeTextFile(innerIndex, "a.txt\ndir\n").ok) {
-            std::cerr << "FAILED: could not create staged files\n";
+        if (!fileSystem.writeTextFile(innerIndex, indexContents).ok) {
+            std::cerr << "FAILED: could not create inner index\n";
             return 1;
         }
 
-        std::vector<std::string> toClear = {"a.txt", "dir"};
-        if (!fileSystem.clearStage(toClear, stagePath, innerIndex)) {
-            std::cerr << "FAILED: clearStage should succeed for staged paths\n";
-            return 1;
-        }
-        if (fs::exists(stagedFile) || fs::exists(stagePath / "dir") || !fs::exists(innerIndex)) {
-            std::cerr << "FAILED: clearStage removed the wrong files\n";
-            return 1;
-        }
-
-        // FS-6: Test that the index itself can never be cleared.
-        std::vector<std::string> indexOnly = {"index.txt"};
-        if (fileSystem.clearStage(indexOnly, stagePath, innerIndex) || !fs::exists(innerIndex)) {
+        std::vector<std::string> indexSelection = {"index.txt"};
+        if (fileSystem.clearStage(indexSelection, stagePath, innerIndex) ||
+            !fs::exists(innerIndex)) {
             std::cerr << "FAILED: clearStage must refuse to delete the index\n";
             return 1;
         }
