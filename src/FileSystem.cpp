@@ -208,21 +208,22 @@ namespace minigit {
 
         return true;
     }
-    void FileSystem::inespectFiles(std::vector<std::filesystem::path>& paths,
-                                   std::vector<std::string>& selectedPaths,
-                                   std::vector<std::string>& results) {
+    void FileSystem::inespectFiles(const std::vector<std::filesystem::path>& paths,
+                                   const std::vector<std::string>& selectedPaths,
+                                   std::vector<std::string>& results) const {
         results.clear();
         results.reserve(selectedPaths.size());
 
         for (std::size_t i = 0; i < selectedPaths.size(); ++i) {
             if (i >= paths.size()) {
-                results.push_back("missing: " + selectedPaths[i]);
+                results.push_back("could not inspect: " + selectedPaths[i]);
                 continue;
             }
 
             std::error_code error;
             const auto status = std::filesystem::status(paths[i], error);
             if (error == std::errc::no_such_file_or_directory
+                || error == std::errc::not_a_directory
                 || (!error && !std::filesystem::exists(status))) {
                 results.push_back("missing: " + selectedPaths[i]);
             } else if (!error && std::filesystem::is_regular_file(status)) {
@@ -233,8 +234,8 @@ namespace minigit {
         }
     }
 
-    bool FileSystem::checkStage(std::vector<std::filesystem::path>& paths,
-                                std::vector<std::string>& selectedPaths) {
+    bool FileSystem::checkStage(const std::vector<std::filesystem::path>& paths,
+                                const std::vector<std::string>& selectedPaths) const {
         if (selectedPaths.empty() || paths.size() < selectedPaths.size()) {
             return false;
         }

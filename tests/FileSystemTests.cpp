@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -59,8 +60,31 @@ bool checkInspectionAndStage(const std::filesystem::path& root) {
 
     std::vector<fs::path> shortPaths{existing};
     fileSystem.inespectFiles(shortPaths, selectedPaths, results);
-    if (results.size() != 2 || results[1].find("missing: work/missing.txt") != 0) {
-        std::cerr << "FAILED: a selection without a corresponding path should be missing\n";
+    if (results.size() != 2 || results[1].find("could not inspect: work/missing.txt") != 0) {
+        std::cerr << "FAILED: a selection without a corresponding path should be uninspectable\n";
+        return false;
+    }
+
+    const auto blockedAncestor = root / "blocked";
+    if (!writeFixture(blockedAncestor, "regular file")) {
+        std::cerr << "FAILED: could not create blocked-path fixture\n";
+        return false;
+    }
+    std::vector<fs::path> blockedPaths{blockedAncestor / "child.txt"};
+    std::vector<std::string> blockedSelection{"blocked/child.txt"};
+    fileSystem.inespectFiles(blockedPaths, blockedSelection, results);
+    if (results.size() != 1 || results[0].find("missing: blocked/child.txt") != 0) {
+        std::cerr << "FAILED: a regular-file ancestor should make its child missing\n";
+        return false;
+    }
+
+    const minigit::FileSystem constFileSystem;
+    const std::vector<fs::path> constPaths{existing};
+    const std::vector<std::string> constSelection{"work/notes.txt"};
+    constFileSystem.inespectFiles(constPaths, constSelection, results);
+    if (results.size() != 1 || results[0].find("present: work/notes.txt") != 0
+        || !constFileSystem.checkStage(constPaths, constSelection)) {
+        std::cerr << "FAILED: const callers should be able to inspect and check paths\n";
         return false;
     }
 
