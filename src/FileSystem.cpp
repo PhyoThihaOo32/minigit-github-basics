@@ -88,7 +88,7 @@ namespace minigit {
         namespace fs = std::filesystem;
         std::error_code error;
 
-         if (headpath.empty()) {
+        if (headpath.empty() || newID.empty()) {
             return false;
         }
 
@@ -105,6 +105,12 @@ namespace minigit {
 
         fs::path tempPath = headpath;
         tempPath += ".tmp";
+
+        const auto tempStatus = fs::symlink_status(tempPath, error);
+        if (tempStatus.type() != fs::file_type::not_found) {
+            return false;
+        }
+        error.clear();
 
         if (!writeTextFile(tempPath, newID).ok) {
             fs::remove(tempPath, error);
@@ -177,8 +183,11 @@ namespace minigit {
             }
             error.clear();
 
-            targets.push_back(current);
+        if (std::find(targets.begin(), targets.end(), current) == targets.end()) {
+                targets.push_back(current);
+            }
         }
+        
         //Delete files after validation
         for (const auto& target : targets) {
             if (!fs::remove(target, error) || error) {

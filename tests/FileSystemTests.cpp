@@ -18,7 +18,6 @@ int main() {
             std::cerr << "FAILED: could not create test directory: " << error.message() << '\n';
             return 1;
         }
-
         fs::current_path(directory.path());
         const minigit::FileSystem fileSystem;
         const bool empty = fs::is_empty(directory.path(), error);
@@ -143,7 +142,6 @@ int main() {
             return 1;
         }
 
-        // FS-6: Test a selected path outside the stage directory.
        auto headPath = directory.path() / "HEAD";
         if (!fileSystem.writeTextFile(headPath, "old-id").ok) {
             std::cerr << "FAILED: could not create HEAD\n";
@@ -158,7 +156,7 @@ int main() {
             return 1;
         }
 
-        // FS-6: Test that a directory HEAD path is rejected.
+       
         auto headDirectory = directory.path() / "headDir";
         fs::create_directories(headDirectory);
         if (fileSystem.updateHEAD(headDirectory, newID) || !fs::is_directory(headDirectory)) {
@@ -166,7 +164,15 @@ int main() {
             return 1;
         }
 
-        // FS-6 setup: a stage with two staged copies, a working copy and an index.
+        std::string emptyID;
+        const bool emptyUpdated = fileSystem.updateHEAD(headPath, emptyID);
+        const auto headAfterEmpty = fileSystem.readTextFile(headPath);
+        if (emptyUpdated || !headAfterEmpty.ok || headAfterEmpty.text != "new-id") {
+            std::cerr << "FAILED: updateHEAD should reject an empty ID\n";
+            return 1;
+        }
+
+        
         auto stagePath = directory.path() / "stage";
         auto indexPath = directory.path() / "index.txt";
         const auto selectedStaged = stagePath / "a.txt";
@@ -182,7 +188,6 @@ int main() {
             return 1;
         }
 
-        // FS-6: Test clearing one selected staged file.
         std::vector<std::string> toClear = {"a.txt"};
         if (!fileSystem.clearStage(toClear, stagePath, indexPath)) {
             std::cerr << "FAILED: clearStage should succeed for a staged file\n";
@@ -200,8 +205,20 @@ int main() {
             std::cerr << "FAILED: clearStage should remove only the selected staged file\n";
             return 1;
         }
+        const auto duplicateStaged = stagePath / "d.txt";
+        if (!fileSystem.writeTextFile(duplicateStaged, "staged d").ok) {
+            std::cerr << "FAILED: could not create duplicate staged file\n";
+            return 1;
+        }
 
-        // FS-6: Test a selected path outside the stage directory.
+        std::vector<std::string> duplicateSelection = {"d.txt", "d.txt"};
+        if (!fileSystem.clearStage(duplicateSelection, stagePath, indexPath) ||
+            fs::exists(duplicateStaged)) {
+            std::cerr << "FAILED: clearStage should handle a duplicated selection\n";
+            return 1;
+        }
+
+
         const auto outsidePath = directory.path() / "outside.txt";
         if (!fileSystem.writeTextFile(outsidePath, "content").ok) {
             std::cerr << "FAILED: could not create outside file\n";
@@ -217,7 +234,7 @@ int main() {
             return 1;
         }
 
-        // FS-6: Test that selecting a directory is rejected and nothing is deleted.
+
         const auto nestedStaged = stagePath / "dir" / "c.txt";
         if (!fileSystem.writeTextFile(nestedStaged, "staged c").ok) {
             std::cerr << "FAILED: could not create nested staged file\n";
@@ -231,7 +248,6 @@ int main() {
             return 1;
         }
 
-        // FS-6: Test that the index can never be cleared, even inside the stage.
         auto innerIndex = stagePath / "index.txt";
         if (!fileSystem.writeTextFile(innerIndex, indexContents).ok) {
             std::cerr << "FAILED: could not create inner index\n";
