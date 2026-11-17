@@ -144,8 +144,8 @@ int main() {
         }
 
         // FS-6: Test a selected path outside the stage directory.
-        const auto stagePath = directory.path() / "stage";
-        const auto indexPath = directory.path() / "index.txt";
+        auto stagePath = directory.path() / "stage";
+        auto indexPath = directory.path() / "index.txt";
         const auto selectedPath = directory.path() / "outside.txt";
 
         fs::create_directories(stagePath);
