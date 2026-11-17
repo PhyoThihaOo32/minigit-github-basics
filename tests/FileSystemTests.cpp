@@ -2,9 +2,76 @@
 #include "TestDirectory.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <string>
 #include <system_error>
 #include <vector>
+
+namespace {
+
+bool writeFixture(const std::filesystem::path& path, const std::string& contents) {
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output << contents;
+    return output.good();
+}
+
+bool readFixture(const std::filesystem::path& path, std::string& contents) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        return false;
+    }
+    contents.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    return !input.bad();
+}
+
+bool checkInspectionAndStage(const std::filesystem::path& root) {
+    namespace fs = std::filesystem;
+    const auto existing = root / "work" / "notes.txt";
+    const auto missing = root / "work" / "missing.txt";
+    const auto staged = root / ".minigit" / "stage" / "work" / "notes.txt";
+    if (!writeFixture(existing, "working copy") || !writeFixture(staged, "staged copy")) {
+        std::cerr << "FAILED: could not create inspection fixtures\n";
+        return false;
+    }
+
+    minigit::FileSystem fileSystem;
+    std::vector<fs::path> inspectPaths{existing, missing};
+    std::vector<std::string> selectedPaths{"work/notes.txt", "work/missing.txt"};
+    std::vector<std::string> results{"stale result"};
+    fileSystem.inespectFiles(inspectPaths, selectedPaths, results);
+    if (results.size() != 2
+        || results[0].find("present: work/notes.txt") != 0
+        || results[1].find("missing: work/missing.txt") != 0) {
+        std::cerr << "FAILED: inspection should distinguish present and missing selections\n";
+        return false;
+    }
+
+    std::vector<fs::path> stagedPaths{staged};
+    std::vector<std::string> stagedSelection{"work/notes.txt"};
+    if (!fileSystem.checkStage(stagedPaths, stagedSelection)) {
+        std::cerr << "FAILED: a complete staged selection should pass\n";
+        return false;
+    }
+
+    std::vector<fs::path> incompleteStage{staged, root / ".minigit" / "stage" / "work" / "missing.txt"};
+    if (fileSystem.checkStage(incompleteStage, selectedPaths)) {
+        std::cerr << "FAILED: a selection with a missing staged file should fail\n";
+        return false;
+    }
+
+    std::string contents;
+    if (!readFixture(existing, contents) || contents != "working copy"
+        || !readFixture(staged, contents) || contents != "staged copy"
+        || fs::exists(missing)) {
+        std::cerr << "FAILED: inspection changed or created a working/staged file\n";
+        return false;
+    }
+    return true;
+}
+
+} // namespace
 
 int main() {
     namespace fs = std::filesystem;
@@ -274,6 +341,10 @@ int main() {
         if (fileSystem.clearStage(indexSelection, stagePath, innerIndex) ||
             !fs::exists(innerIndex)) {
             std::cerr << "FAILED: clearStage must refuse to delete the index\n";
+            return 1;
+        }
+
+        if (!checkInspectionAndStage(directory.path() / "inspection")) {
             return 1;
         }
 
