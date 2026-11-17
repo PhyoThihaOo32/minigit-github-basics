@@ -48,6 +48,22 @@ bool checkInspectionAndStage(const std::filesystem::path& root) {
         return false;
     }
 
+    std::vector<fs::path> nonFilePaths{root / "work"};
+    std::vector<std::string> nonFileSelection{"work"};
+    fileSystem.inespectFiles(nonFilePaths, nonFileSelection, results);
+    if (results.size() != 1 || results[0].find("could not inspect: work") != 0
+        || fileSystem.checkStage(nonFilePaths, nonFileSelection)) {
+        std::cerr << "FAILED: directories should be reported as non-file inspection failures\n";
+        return false;
+    }
+
+    std::vector<fs::path> shortPaths{existing};
+    fileSystem.inespectFiles(shortPaths, selectedPaths, results);
+    if (results.size() != 2 || results[1].find("missing: work/missing.txt") != 0) {
+        std::cerr << "FAILED: a selection without a corresponding path should be missing\n";
+        return false;
+    }
+
     std::vector<fs::path> stagedPaths{staged};
     std::vector<std::string> stagedSelection{"work/notes.txt"};
     if (!fileSystem.checkStage(stagedPaths, stagedSelection)) {

@@ -34,12 +34,13 @@ namespace minigit {
         bool clearStage(std::vector<std::string>& selectedPaths,std::filesystem::path& stagePath, std::filesystem::path& indexPath) const;
 
         // Each paths[i] is the filesystem location for selectedPaths[i].
-        // Results are replaced with one present/missing status per selection.
+        // Results are replaced with one present/missing/error status per selection.
         void inespectFiles(std::vector<std::filesystem::path>& paths,
                            std::vector<std::string>& selectedPaths,
                            std::vector<std::string>& results);
 
-        // Here paths contains the corresponding staged file locations.
+        // Here paths contains staged file locations in the same order as selectedPaths.
+        // Returns false for an empty selection, a missing/non-file entry, or an inspection error.
         bool checkStage(std::vector<std::filesystem::path>& paths,
                         std::vector<std::string>& selectedPaths);
         
