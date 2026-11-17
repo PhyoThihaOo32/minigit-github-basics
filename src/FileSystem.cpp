@@ -82,18 +82,6 @@ namespace minigit {
         std::filesystem::copy_file(source, target);
     }
 
-    // FS - 6: Update Head file with new commit ID. Return true if successful, false otherwise.
-    bool FileSystem::updateHEAD(std::filesystem::path& headpath, std::string& newID) const
-    {
-        std::error_code error;
-        if (std::filesystem::is_directory(headpath, error)) {
-            return false;
-        }
-
-        // writeTextFile truncates, so the old ID is fully replaced.
-        return writeTextFile(headpath, newID).ok;
-    }
-
     // FS-6: Remove the staged copies that were saved in a checkpoint.
     bool FileSystem::updateHEAD(std::filesystem::path& headpath, std::string& newID) const
     {
