@@ -1,7 +1,9 @@
 #include "FileSystem.hpp"
 #include "TextReader.hpp"
+#include <algorithm>
 #include <fstream>
 #include <system_error>
+
 
 namespace minigit {
 
