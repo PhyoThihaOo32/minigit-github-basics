@@ -48,7 +48,7 @@ int main() {
         if (!read.ok || read.text != "hello\n") {
             std::cerr << "FAILED: file contents do not match\n";
             return 1;
-            }
+        }
         // FS-2: Test reading an empty file.
         const auto emptyFile = directory.path() / "empty.txt";
 
@@ -143,11 +143,6 @@ int main() {
             return 1;
         }
 
-        if (!directory.cleanup(error)) {
-            std::cerr << "FAILED: could not clean up test directory: " << error.message() << '\n';
-            return 1;
-        }
-
         // FS-6: Test a selected path outside the stage directory.
         const auto stagePath = directory.path() / "stage";
         const auto indexPath = directory.path() / "index.txt";
@@ -161,6 +156,11 @@ int main() {
 
         if (cleared) {
             std::cerr << "FAILED: clearStage should return false for a path outside the stage directory\n";
+            return 1;
+        }
+
+        if (!directory.cleanup(error)) {
+            std::cerr << "FAILED: could not clean up test directory: " << error.message() << '\n';
             return 1;
         }
 
