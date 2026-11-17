@@ -143,19 +143,51 @@ int main() {
             return 1;
         }
 
-        // FS-6: Test a selected path outside the stage directory.
+                // FS-6: Test a selected path outside the stage directory.
         auto stagePath = directory.path() / "stage";
         auto indexPath = directory.path() / "index.txt";
         const auto selectedPath = directory.path() / "outside.txt";
 
         fs::create_directories(stagePath);
-        fileSystem.writeTextFile(selectedPath, "content");
+
+        if (!fileSystem.writeTextFile(selectedPath, "content").ok) {
+            std::cerr << "FAILED: could not create outside file\n";
+            return 1;
+        }
 
         std::vector<std::string> selectedPaths = {selectedPath.string()};
-        const bool cleared = fileSystem.clearStage(selectedPaths, stagePath, indexPath);
-
-        if (cleared) {
+        if (fileSystem.clearStage(selectedPaths, stagePath, indexPath) ||
+            !fs::exists(selectedPath)) {
             std::cerr << "FAILED: clearStage should return false for a path outside the stage directory\n";
+            return 1;
+        }
+
+        // FS-6: Test clearing staged files while keeping the index.
+        auto stagedFile = stagePath / "a.txt";
+        auto stagedNested = stagePath / "dir" / "b.txt";
+        auto innerIndex = stagePath / "index.txt";
+
+        if (!fileSystem.writeTextFile(stagedFile, "a").ok ||
+            !fileSystem.writeTextFile(stagedNested, "b").ok ||
+            !fileSystem.writeTextFile(innerIndex, "a.txt\ndir\n").ok) {
+            std::cerr << "FAILED: could not create staged files\n";
+            return 1;
+        }
+
+        std::vector<std::string> toClear = {"a.txt", "dir"};
+        if (!fileSystem.clearStage(toClear, stagePath, innerIndex)) {
+            std::cerr << "FAILED: clearStage should succeed for staged paths\n";
+            return 1;
+        }
+        if (fs::exists(stagedFile) || fs::exists(stagePath / "dir") || !fs::exists(innerIndex)) {
+            std::cerr << "FAILED: clearStage removed the wrong files\n";
+            return 1;
+        }
+
+        // FS-6: Test that the index itself can never be cleared.
+        std::vector<std::string> indexOnly = {"index.txt"};
+        if (fileSystem.clearStage(indexOnly, stagePath, innerIndex) || !fs::exists(innerIndex)) {
+            std::cerr << "FAILED: clearStage must refuse to delete the index\n";
             return 1;
         }
 

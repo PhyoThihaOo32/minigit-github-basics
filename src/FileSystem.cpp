@@ -142,6 +142,13 @@ bool FileSystem::updateHEAD(std::filesystem::path& headpath,
 
             targets.push_back(target);
         }
-        
+
+        for (const auto& target : targets) {
+            fs::remove_all(target, error);
+            if (error) {
+                return false;
+            }
+        }
+        return true;
 } 
 // namespace minigit
