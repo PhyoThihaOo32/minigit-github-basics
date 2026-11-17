@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <system_error>
+#include <vector>
 
 int main() {
     namespace fs = std::filesystem;
@@ -17,7 +18,6 @@ int main() {
             std::cerr << "FAILED: could not create test directory: " << error.message() << '\n';
             return 1;
         }
-
         fs::current_path(directory.path());
         const minigit::FileSystem fileSystem;
         const bool empty = fs::is_empty(directory.path(), error);
@@ -47,7 +47,7 @@ int main() {
         if (!read.ok || read.text != "hello\n") {
             std::cerr << "FAILED: file contents do not match\n";
             return 1;
-            }
+        }
         // FS-2: Test reading an empty file.
         const auto emptyFile = directory.path() / "empty.txt";
 
@@ -142,11 +142,145 @@ int main() {
             return 1;
         }
 
+        auto headPath = directory.path() / "HEAD";
+        const auto legacyTemp = directory.path() / "HEAD.tmp";
+        const auto occupiedScratch = directory.path() / ".minigit-head-update-0";
+        const auto sentinel = occupiedScratch / "keep.txt";
+
+        if (!fileSystem.writeTextFile(headPath, "old-id").ok ||
+            !fileSystem.writeTextFile(legacyTemp, "existing file").ok ||
+            !fileSystem.writeTextFile(sentinel, "owned by another update").ok) {
+            std::cerr << "FAILED: could not create HEAD update fixtures\n";
+            return 1;
+        }
+
+        std::string newID = "new-id";
+        const bool headUpdated = fileSystem.updateHEAD(headPath, newID);
+        const auto headRead = fileSystem.readTextFile(headPath);
+        if (!headUpdated || !headRead.ok || headRead.text != "new-id") {
+            std::cerr << "FAILED: updateHEAD should replace the old ID\n";
+            return 1;
+        }
+
+        const auto preservedTemp = fileSystem.readTextFile(legacyTemp);
+        const auto preservedSentinel = fileSystem.readTextFile(sentinel);
+        if (!preservedTemp.ok || preservedTemp.text != "existing file" ||
+            !preservedSentinel.ok || preservedSentinel.text != "owned by another update" ||
+            fs::exists(directory.path() / ".minigit-head-update-1")) {
+            std::cerr << "FAILED: updateHEAD should clean up only its own temporary files\n";
+            return 1;
+        }
+
+
+       
+        auto headDirectory = directory.path() / "headDir";
+        fs::create_directories(headDirectory);
+        if (fileSystem.updateHEAD(headDirectory, newID) || !fs::is_directory(headDirectory)) {
+            std::cerr << "FAILED: updateHEAD should return false for a directory\n";
+            return 1;
+        }
+
+        std::string emptyID;
+        const bool emptyUpdated = fileSystem.updateHEAD(headPath, emptyID);
+        const auto headAfterEmpty = fileSystem.readTextFile(headPath);
+        if (emptyUpdated || !headAfterEmpty.ok || headAfterEmpty.text != "new-id") {
+            std::cerr << "FAILED: updateHEAD should reject an empty ID\n";
+            return 1;
+        }
+
+        
+        auto stagePath = directory.path() / "stage";
+        auto indexPath = directory.path() / "index.txt";
+        const auto selectedStaged = stagePath / "a.txt";
+        const auto unselectedStaged = stagePath / "b.txt";
+        const auto workingCopy = directory.path() / "a.txt";
+        const std::string indexContents = "a.txt\nb.txt\n";
+
+        if (!fileSystem.writeTextFile(selectedStaged, "staged a").ok ||
+            !fileSystem.writeTextFile(unselectedStaged, "staged b").ok ||
+            !fileSystem.writeTextFile(workingCopy, "working a").ok ||
+            !fileSystem.writeTextFile(indexPath, indexContents).ok) {
+            std::cerr << "FAILED: could not create stage files\n";
+            return 1;
+        }
+
+        std::vector<std::string> toClear = {"a.txt"};
+        if (!fileSystem.clearStage(toClear, stagePath, indexPath)) {
+            std::cerr << "FAILED: clearStage should succeed for a staged file\n";
+            return 1;
+        }
+
+        const auto unselectedRead = fileSystem.readTextFile(unselectedStaged);
+        const auto workingRead = fileSystem.readTextFile(workingCopy);
+        const auto indexRead = fileSystem.readTextFile(indexPath);
+
+        if (fs::exists(selectedStaged) ||
+            !unselectedRead.ok || unselectedRead.text != "staged b" ||
+            !workingRead.ok || workingRead.text != "working a" ||
+            !indexRead.ok || indexRead.text != indexContents) {
+            std::cerr << "FAILED: clearStage should remove only the selected staged file\n";
+            return 1;
+        }
+        const auto duplicateStaged = stagePath / "d.txt";
+        if (!fileSystem.writeTextFile(duplicateStaged, "staged d").ok) {
+            std::cerr << "FAILED: could not create duplicate staged file\n";
+            return 1;
+        }
+
+        std::vector<std::string> duplicateSelection = {"d.txt", "d.txt"};
+        if (!fileSystem.clearStage(duplicateSelection, stagePath, indexPath) ||
+            fs::exists(duplicateStaged)) {
+            std::cerr << "FAILED: clearStage should handle a duplicated selection\n";
+            return 1;
+        }
+
+
+        const auto outsidePath = directory.path() / "outside.txt";
+        if (!fileSystem.writeTextFile(outsidePath, "content").ok) {
+            std::cerr << "FAILED: could not create outside file\n";
+            return 1;
+        }
+
+        std::vector<std::string> outsideSelection = {(fs::path("..") / "outside.txt").string()};
+        std::vector<std::string> absoluteSelection = {outsidePath.string()};
+        if (fileSystem.clearStage(outsideSelection, stagePath, indexPath) ||
+            fileSystem.clearStage(absoluteSelection, stagePath, indexPath) ||
+            !fs::exists(outsidePath)) {
+            std::cerr << "FAILED: clearStage should return false for a path outside the stage directory\n";
+            return 1;
+        }
+
+
+        const auto nestedStaged = stagePath / "dir" / "c.txt";
+        if (!fileSystem.writeTextFile(nestedStaged, "staged c").ok) {
+            std::cerr << "FAILED: could not create nested staged file\n";
+            return 1;
+        }
+
+        std::vector<std::string> directorySelection = {"dir"};
+        if (fileSystem.clearStage(directorySelection, stagePath, indexPath) ||
+            !fs::exists(nestedStaged)) {
+            std::cerr << "FAILED: clearStage should reject a directory selection\n";
+            return 1;
+        }
+
+        auto innerIndex = stagePath / "index.txt";
+        if (!fileSystem.writeTextFile(innerIndex, indexContents).ok) {
+            std::cerr << "FAILED: could not create inner index\n";
+            return 1;
+        }
+
+        std::vector<std::string> indexSelection = {"index.txt"};
+        if (fileSystem.clearStage(indexSelection, stagePath, innerIndex) ||
+            !fs::exists(innerIndex)) {
+            std::cerr << "FAILED: clearStage must refuse to delete the index\n";
+            return 1;
+        }
+
         if (!directory.cleanup(error)) {
             std::cerr << "FAILED: could not clean up test directory: " << error.message() << '\n';
             return 1;
         }
-
 
     } catch (const fs::filesystem_error& error) {
         std::cerr << "FAILED: " << error.what() << '\n';

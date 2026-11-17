@@ -1,7 +1,9 @@
 #include "FileSystem.hpp"
 #include "TextReader.hpp"
+#include <algorithm>
 #include <fstream>
 #include <system_error>
+
 
 namespace minigit {
 
@@ -81,4 +83,129 @@ namespace minigit {
     {
         std::filesystem::copy_file(source, target);
     }
-} // namespace minigit
+
+    // Replace HEAD after the new ID has been written successfully.
+    bool FileSystem::updateHEAD(std::filesystem::path& headpath, std::string& newID) const
+    {
+        namespace fs = std::filesystem;
+        std::error_code error;
+
+        if (headpath.empty() || newID.empty()) {
+            return false;
+        }
+
+        const auto status = fs::symlink_status(headpath, error);
+        if (error && status.type() != fs::file_type::not_found) {
+            return false;
+        }
+        if (fs::is_symlink(status) || fs::is_directory(status)) {
+            return false;
+        }
+        if (fs::exists(status) && !fs::is_regular_file(status)) {
+            return false;
+        }
+
+        const auto parent = headpath.has_parent_path() ? headpath.parent_path() : fs::path(".");
+        fs::create_directories(parent, error);
+        if (error) {
+            return false;
+        }
+
+        // Claim a directory beside HEAD so the replacement stays on the same filesystem.
+        for (int attempt = 0; attempt < 100; ++attempt) {
+            const auto scratch = parent / (".minigit-head-update-" + std::to_string(attempt));
+            if (!fs::create_directory(scratch, error)) {
+                if (error && error != std::errc::file_exists) {
+                    return false;
+                }
+                continue;
+            }
+
+            const auto replacement = scratch / "replacement";
+            const bool written = writeTextFile(replacement, newID).ok;
+            if (written) {
+                fs::rename(replacement, headpath, error);
+            }
+            const bool updated = written && !error;
+
+            std::error_code cleanupError;
+            if (!updated) {
+                fs::remove(replacement, cleanupError);
+            }
+            fs::remove(scratch, cleanupError);
+            return updated;
+        }
+        return false;
+    }
+    
+    bool FileSystem::clearStage(std::vector<std::string>& selectedPaths, std::filesystem::path& stagePath, std::filesystem::path& indexPath) const
+    {
+        namespace fs = std::filesystem;
+        std::error_code error;
+
+        // The stage itself must be a real directory, not a link to somewhere else.
+        const auto stageStatus = fs::symlink_status(stagePath, error);
+        if (error || !fs::is_directory(stageStatus)) {
+            return false;
+        }
+
+        const fs::path stageRoot = fs::weakly_canonical(stagePath, error);
+        if (error) {
+            return false;
+        }
+        const fs::path indexFile = fs::weakly_canonical(indexPath, error);
+        if (error) {
+            return false;
+        }
+
+        // Validate every path before deleting anything, so a bad entry doesn't leave the stage in a partially cleared state.
+        std::vector<fs::path> targets;
+        for (const auto& selected : selectedPaths) {
+            if (selected.empty()) {
+                return false;
+            }
+
+            const fs::path relative = fs::path(selected).lexically_normal();
+
+            // Must be a relative path that stays inside the stage.
+            if (relative.has_root_path() || relative.empty() ||
+                relative == "." || *relative.begin() == "..") {
+                return false;
+            }
+
+            // Walk each component so no directory or file along the way is a symbolic link that could point outside the stage.
+            fs::path current = stageRoot;
+            for (const auto& part : relative) {
+                current /= part;
+                const auto partStatus = fs::symlink_status(current, error);
+                if (error || fs::is_symlink(partStatus)) {
+                    return false;
+                }
+            }
+
+            // Only plain files may be cleared
+            if (!fs::is_regular_file(fs::symlink_status(current, error)) || error) {
+                return false;
+            }
+
+            // Never delete the index
+            if (fs::equivalent(current, indexFile, error) || current == indexFile) {
+                return false;
+            }
+            error.clear();
+
+        if (std::find(targets.begin(), targets.end(), current) == targets.end()) {
+                targets.push_back(current);
+            }
+        }
+        
+        //Delete files after validation
+        for (const auto& target : targets) {
+            if (!fs::remove(target, error) || error) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}// namespace minigit
