@@ -83,7 +83,7 @@ namespace minigit {
     }
 
     // FS - 6: Update Head file with new commit ID. Return true if successful, false otherwise.
-bool FileSystem::updateHEAD(std::filesystem::path& headpath,
+    bool FileSystem::updateHEAD(std::filesystem::path& headpath,
                                 std::string& newID) const
     {
         std::error_code error;
@@ -150,4 +150,5 @@ bool FileSystem::updateHEAD(std::filesystem::path& headpath,
             }
         }
         return true;
-} // namespace minigit
+    } 
+}// namespace minigit
