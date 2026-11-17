@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <system_error>
+#include <vector>
 
 int main() {
     namespace fs = std::filesystem;
@@ -147,6 +148,21 @@ int main() {
             return 1;
         }
 
+        // FS-6: Test a selected path outside the stage directory.
+        const auto stagePath = directory.path() / "stage";
+        const auto indexPath = directory.path() / "index.txt";
+        const auto selectedPath = directory.path() / "outside.txt";
+
+        fs::create_directories(stagePath);
+        fileSystem.writeTextFile(selectedPath, "content");
+
+        std::vector<std::string> selectedPaths = {selectedPath.string()};
+        const bool cleared = fileSystem.clearStage(selectedPaths, stagePath, indexPath);
+
+        if (cleared) {
+            std::cerr << "FAILED: clearStage should return false for a path outside the stage directory\n";
+            return 1;
+        }
 
     } catch (const fs::filesystem_error& error) {
         std::cerr << "FAILED: " << error.what() << '\n';

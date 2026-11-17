@@ -27,5 +27,9 @@ namespace minigit {
         ReadResult readTextFile(const std::filesystem::path& filePath) const;
 
         void copy(const std::filesystem::path& source,const std::filesystem::path& target) const;
+
+        // Delete a file or directory. If the path is a directory, delete it recursively.
+        bool updateHEAD(std::filesystem::path& headpath,std::string& newID) const;
+        bool clearStage(std::vector<std::string>& selectedPaths,std::filesystem::path& stagePath, std::filesystem::path& indexPath) const;
     };
 } // namespace minigit

@@ -81,4 +81,67 @@ namespace minigit {
     {
         std::filesystem::copy_file(source, target);
     }
-} // namespace minigit
+
+    // FS - 6: Update Head file with new commit ID. Return true if successful, false otherwise.
+bool FileSystem::updateHEAD(std::filesystem::path& headpath,
+                                std::string& newID) const
+    {
+        std::error_code error;
+        if (std::filesystem::is_directory(headpath, error)) {
+            return false;
+        }
+
+        // writeTextFile truncates, so the old ID is fully replaced.
+        return writeTextFile(headpath, newID).ok;
+    }
+
+    // FS-6: Remove the staged copies that were saved in a checkpoint.
+    bool FileSystem::clearStage(std::vector<std::string>& selectedPaths,
+                                std::filesystem::path& stagePath,
+                                std::filesystem::path& indexPath) const
+    {
+        namespace fs = std::filesystem;
+        std::error_code error;
+
+        if (!fs::is_directory(stagePath, error) || error) {
+            return false;
+        }
+
+        const fs::path stageRoot = fs::weakly_canonical(stagePath, error);
+        if (error) {
+            return false;
+        }
+        const fs::path indexFile = fs::weakly_canonical(indexPath, error);
+        if (error) {
+            return false;
+        }
+
+        // Validate every path before deleting anything, so a bad entry doesn't leave the stage in a half-cleared state.
+        std::vector<fs::path> targets;
+        for (const auto& selected : selectedPaths) {
+            if (selected.empty()) {
+                return false;
+            }
+
+            const fs::path target = fs::weakly_canonical(stageRoot / selected, error);
+            if (error) {
+                return false;
+            }
+
+            // The target must sit strictly inside the stage directory.
+            const fs::path relative = target.lexically_relative(stageRoot);
+            if (relative.empty() || relative == "." ||
+                *relative.begin() == "..") {
+                return false;
+            }
+
+            // Never delete the index, even if it lives inside the stage.
+            if (target == indexFile) {
+                return false;
+            }
+
+            targets.push_back(target);
+        }
+        
+} 
+// namespace minigit
