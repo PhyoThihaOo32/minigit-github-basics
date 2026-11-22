@@ -437,7 +437,6 @@ int main()
     try
     {
         const auto root = directory.path();
-        passed = checkConstruction(directory.path());
         passed = checkConstruction(root);
         passed = checkFreshInit(root) && passed;
         passed = checkRepeatedInit(root) && passed;
@@ -447,7 +446,7 @@ int main()
     }
     catch (const std::exception& failure)
     {
-        std::cerr << "Manager construction failed: " << failure.what() << '\n';
+        std::cerr << "MiniGitManager checks failed: " << failure.what() << '\n'; //wording updated
     }
 
     if (!directory.cleanup(error))
@@ -457,7 +456,7 @@ int main()
     }
     if (passed)
     {
-        std::cout << "MiniGitManager construction checks passed\n";
+        std::cout << "MiniGitManager construction and init checks passed\n"; //wording updated
     }
     return passed ? 0 : 1;
 }
