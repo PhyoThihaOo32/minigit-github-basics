@@ -6,7 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(minigit_paths src/PathLab.cpp src/RepositoryPaths.cpp src/FileSystem.cpp)
-target_sources(minigit_paths PRIVATE src/ReadIndex.cpp)
+target_sources(minigit_paths PRIVATE
+    src/ReadIndex.cpp
+    src/MiniGitManager.cpp
+    src/FileSystemPaths.cpp)
 target_include_directories(minigit_paths PUBLIC include)
 
 include(CTest)
@@ -47,4 +50,13 @@ if(BUILD_TESTING)
     add_executable(filesystem_tests tests/FileSystemTests.cpp)
     target_link_libraries(filesystem_tests PRIVATE minigit_paths)
     add_test(NAME filesystem_tests COMMAND filesystem_tests)
+
+    add_executable(minigit_manager_tests tests/MiniGitManagerTests.cpp)
+    target_link_libraries(minigit_manager_tests PRIVATE minigit_paths)
+    add_test(NAME minigit_manager_tests COMMAND minigit_manager_tests)
+
+    add_executable(filesystem_paths_tests tests/FileSystemPathsTests.cpp)
+    target_link_libraries(filesystem_paths_tests PRIVATE minigit_paths)
+    target_include_directories(filesystem_paths_tests PRIVATE src)
+    add_test(NAME filesystem_paths_tests COMMAND filesystem_paths_tests)
 endif()
