@@ -1,4 +1,5 @@
 #include "FileSystem.hpp"
+#include "FileStatusResult.hpp"
 #include "TestDirectory.hpp"
 
 #include <exception>
@@ -82,6 +83,35 @@ bool checkPaths(const minigit::FileSystem& fileSystem, const fs::path& root)
                  "failed operations must preserve the existing file");
 }
 
+bool checkStatusErrors(const fs::path& root)
+{
+    const auto path = root / "unreadable";
+    const fs::file_status noStatus(fs::file_type::none);
+    for (const auto reason : {std::errc::permission_denied, std::errc::io_error,
+                              std::errc::not_a_directory})
+    {
+        const auto error = std::make_error_code(reason);
+        try
+        {
+            minigit::detail::checkedFileStatus(path, noStatus, error);
+            return check(false, "inspection errors must reach the caller");
+        }
+        catch (const fs::filesystem_error& failure)
+        {
+            if (!check(failure.code() == error && failure.path1() == path,
+                       "inspection failures must preserve the error code and path"))
+            {
+                return false;
+            }
+        }
+    }
+
+    const auto missing = minigit::detail::checkedFileStatus(
+        path, noStatus, std::make_error_code(std::errc::no_such_file_or_directory));
+    return check(missing.type() == fs::file_type::not_found,
+                 "only a missing-path error should become not_found");
+}
+
 bool checkLinks(const minigit::FileSystem& fileSystem, const fs::path& root)
 {
     const auto target = root / "course" / "team" / "notes.txt";
@@ -102,19 +132,15 @@ bool checkLinks(const minigit::FileSystem& fileSystem, const fs::path& root)
 
     const auto directoryLink = root / "directory-link";
     const auto danglingLink = root / "dangling-link";
-    const auto loop = root / "loop";
     fs::create_directory_symlink(target.parent_path(), directoryLink);
     fs::create_symlink(root / "absent-target", danglingLink);
-    fs::create_directory_symlink(loop, loop);
 
     return check(fs::is_symlink(fileSystem.fileStatus(fileLink)),
                  "inspection must report the file link rather than its target")
         && check(fs::is_symlink(fileSystem.fileStatus(directoryLink)),
                  "inspection must report the directory link rather than its target")
         && check(fs::is_symlink(fileSystem.fileStatus(danglingLink)),
-                 "a dangling link must still be reported as a symbolic link")
-        && checkFilesystemError([&] { fileSystem.fileStatus(loop / "child"); },
-                                "an unresolvable parent link must report an inspection error");
+                 "a dangling link must still be reported as a symbolic link");
 }
 
 } // namespace
@@ -134,6 +160,7 @@ int main()
     {
         const minigit::FileSystem fileSystem;
         passed = checkPaths(fileSystem, directory.path())
+            && checkStatusErrors(directory.path())
             && checkLinks(fileSystem, directory.path());
     }
     catch (const std::exception& failure)

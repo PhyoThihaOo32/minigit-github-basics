@@ -57,5 +57,6 @@ if(BUILD_TESTING)
 
     add_executable(filesystem_paths_tests tests/FileSystemPathsTests.cpp)
     target_link_libraries(filesystem_paths_tests PRIVATE minigit_paths)
+    target_include_directories(filesystem_paths_tests PRIVATE src)
     add_test(NAME filesystem_paths_tests COMMAND filesystem_paths_tests)
 endif()
