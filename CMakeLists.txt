@@ -11,6 +11,17 @@ target_include_directories(minigit_paths PUBLIC include)
 
 include(CTest)
 if(BUILD_TESTING)
+    # Compile each future header independently, without linking unfinished methods.
+    set(interface_header_sources)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/interface_headers")
+    foreach(header IN ITEMS CommandLineApp MiniGitManager IndexTable WorkingTree CommitStore FileState)
+        set(source "${CMAKE_CURRENT_BINARY_DIR}/interface_headers/${header}.cpp")
+        file(WRITE "${source}" "#include \"${header}.hpp\"\n")
+        list(APPEND interface_header_sources "${source}")
+    endforeach()
+    add_library(interface_headers_check OBJECT ${interface_header_sources})
+    target_link_libraries(interface_headers_check PRIVATE minigit_paths)
+
     add_executable(path_lab_tests tests/PathLabTests.cpp)
     target_link_libraries(path_lab_tests PRIVATE minigit_paths)
     add_test(NAME path_lab_tests COMMAND path_lab_tests)

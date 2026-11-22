@@ -23,3 +23,12 @@ ctest --test-dir build -C Release --output-on-failure
 7. Merge only after the required review and CI checks pass.
 
 See [`docs/tutorial.md`](docs/tutorial.md) for the end-to-end walkthrough. Supporting material is in `docs/`, and starter Issue descriptions are in `issue-drafts/`.
+
+## HW12 interfaces and storage
+
+The remaining class headers describe the proposed command and storage interfaces.
+See [`docs/storage-format.md`](docs/storage-format.md) for the disk layout, init
+validation rules, and M2 call chain. These headers declare future operations;
+their implementations and the runnable `minigit` command are separate tasks.
+With testing enabled, the build compiles each new header independently as well
+as building the existing CTest programs.
