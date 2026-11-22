@@ -17,7 +17,7 @@ struct FileInfo
 class FileState
 {
 public:
-    FileState();
+    FileState() = default;
 
     // selected means the path is listed in the root index.txt. Multiple results
     // allow staged content to differ again from the current working file.

@@ -17,6 +17,8 @@ public:
     // Copy the index location. fileSystem must outlive this object.
     IndexTable(const RepositoryPaths& paths, const FileSystem& fileSystem);
 
+    // Copy indexPath_ to a local path before calling FileSystem::readIndex(),
+    // whose existing API takes a non-const reference. Keep this method const.
     std::vector<std::string> readIndex() const;
 
     // The caller validates paths first; reject CR/LF here before writing entries.

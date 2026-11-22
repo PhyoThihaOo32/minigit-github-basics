@@ -119,6 +119,18 @@ one entry must occupy one line.
 reader. `addPath()` preserves existing order and adds an exact entry only once.
 IndexTable must reject CR/LF before writing, even if the caller has already used
 `safeRelativeFile()`; the current M1 path validator does not reject line breaks.
+
+The existing `FileSystem::readIndex()` takes a non-const path reference. Inside
+`IndexTable::readIndex() const`, use a local copy so the stored path stays const:
+
+```cpp
+auto indexPath = indexPath_;
+return fileSystem_.readIndex(indexPath);
+```
+
+Keep the M1 filesystem API unchanged; do not make the stored path mutable or
+cast away constness. This is guidance for the IT-2 implementation.
+
 `removePath()` removes one exact selection; its implementation needs a later
 issue. `clearIndex()` leaves an empty index file after successful commit cleanup.
 All operations preserve working-file contents.
