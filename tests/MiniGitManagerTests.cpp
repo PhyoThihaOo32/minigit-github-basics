@@ -5,9 +5,26 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <type_traits>
 
 namespace
 {
+
+using minigit::FileSystem;
+using minigit::MiniGitManager;
+using minigit::RepositoryPaths;
+
+static_assert(std::is_constructible_v<MiniGitManager,
+                                     const RepositoryPaths&, const FileSystem&>,
+              "named dependencies must remain usable");
+static_assert(!std::is_constructible_v<MiniGitManager, RepositoryPaths, const FileSystem&>
+                  && !std::is_constructible_v<MiniGitManager, const RepositoryPaths&, FileSystem>
+                  && !std::is_constructible_v<MiniGitManager, RepositoryPaths, FileSystem>,
+              "temporary dependencies must be rejected");
+static_assert(!std::is_constructible_v<MiniGitManager, const RepositoryPaths, const FileSystem&>
+                  && !std::is_constructible_v<MiniGitManager, const RepositoryPaths&, const FileSystem>
+                  && !std::is_constructible_v<MiniGitManager, const RepositoryPaths, const FileSystem>,
+              "const temporary dependencies must also be rejected");
 
 bool check(bool condition, const std::string& message)
 {

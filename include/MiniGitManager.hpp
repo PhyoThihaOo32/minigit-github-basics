@@ -15,6 +15,11 @@ public:
     // Both dependencies must outlive this object. Construction changes no files.
     MiniGitManager(const RepositoryPaths& paths, const FileSystem& fileSystem);
 
+    // References to temporary dependencies would dangle after construction.
+    MiniGitManager(const RepositoryPaths&& paths, const FileSystem& fileSystem) = delete;
+    MiniGitManager(const RepositoryPaths& paths, const FileSystem&& fileSystem) = delete;
+    MiniGitManager(const RepositoryPaths&& paths, const FileSystem&& fileSystem) = delete;
+
     // Create a new layout, preserve a valid existing repo, or throw on damage.
     // Print the success/already-initialized message; the CLI prints errors.
     void init();
