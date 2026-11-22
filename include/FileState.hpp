@@ -21,6 +21,8 @@ public:
 
     // selected means the path is listed in the root index.txt. Multiple results
     // allow staged content to differ again from the current working file.
+    // Labels are "untracked", "staged", "modified", "deleted", and "unchanged".
+    // A selected path without staged contents is an error, not an extra label.
     std::vector<std::string> classify(const FileInfo& working,
                                       const FileInfo& staged,
                                       const FileInfo& committed,

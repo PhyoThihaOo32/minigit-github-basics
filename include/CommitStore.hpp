@@ -24,12 +24,14 @@ public:
     // Both dependencies must outlive this object.
     CommitStore(const RepositoryPaths& paths, const FileSystem& fileSystem);
 
-    // Save the snapshot/record and reserve its ID. Return the ID without changing
-    // HEAD or clearing stage/index; MiniGitManager completes those steps.
+    // Validate selected relative paths (including CR/LF rejection) before joining
+    // storage paths. Save a new snapshot/record without replacing an existing ID.
+    // Return its ID without changing HEAD or clearing stage/index.
     std::string saveCommit(const std::vector<std::string>& selectedPaths,
                            const std::string& message) const;
 
     std::vector<std::string> getHistory() const;
+    // Validate IDs as positive decimal digits before constructing commit paths.
     CommitInfo getCommitInfo(const std::string& commitId) const;
     std::vector<std::string> getCommittedFiles(const std::string& commitId) const;
 

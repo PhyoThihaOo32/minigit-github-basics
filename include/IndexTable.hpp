@@ -19,7 +19,8 @@ public:
 
     std::vector<std::string> readIndex() const;
 
-    // The caller validates paths first. Adding an existing entry changes nothing.
+    // The caller validates paths first; reject CR/LF here before writing entries.
+    // Adding an existing entry changes nothing. removePath only unselects a path.
     void addPath(const std::string& path) const;
     void removePath(const std::string& path) const;
 

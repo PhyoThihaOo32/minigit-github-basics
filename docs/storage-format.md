@@ -56,6 +56,13 @@ commits and additional files must be preserved on repeated initialization.
 The `init` check does not parse every saved commit or require future class
 implementations. Full commit-history validation is outside M2.
 
+The classroom workflow runs one command at a time and assumes other processes
+do not replace metadata while a command runs. A separate status check is not an
+atomic no-follow open, and this contract does not promise concurrent or hostile
+filesystem safety. A failed fresh initialization may leave partial metadata;
+the next init must report it as damaged. Recovery must never remove a layout
+that existed before the current invocation.
+
 `MiniGitManager::init()` returns `void`. It prints a success message after new
 initialization, or an already-initialized message for a valid existing repository.
 On failure it throws a useful exception. `CommandLineApp::run()` catches command
@@ -110,6 +117,8 @@ one entry must occupy one line.
 
 `IndexTable::readIndex()` delegates disk reading to the existing FileSystem
 reader. `addPath()` preserves existing order and adds an exact entry only once.
+IndexTable must reject CR/LF before writing, even if the caller has already used
+`safeRelativeFile()`; the current M1 path validator does not reject line breaks.
 `removePath()` removes one exact selection; its implementation needs a later
 issue. `clearIndex()` leaves an empty index file after successful commit cleanup.
 All operations preserve working-file contents.
@@ -149,6 +158,19 @@ index. Do not move away staged data before it has been saved successfully.
 Commit failure recovery and ID reservation are part of the M4 implementation;
 declaring these methods does not claim that multi-file operations are atomic.
 
+Before building any storage path, CommitStore must validate selected paths using
+the relative-path rules above and validate IDs as positive decimal digits only.
+It must fail without overwriting an already occupied commit directory, including
+one left by an interrupted save. Never infer that an available counter means the
+corresponding directory is absent. A saved record whose HEAD update fails, or
+cleanup that fails after HEAD advances, must be reported rather than silently
+retried as a new commit; recovery is a separate M4 design decision. Gaps in IDs
+are allowed. `init` does not delete orphaned records or recover pending cleanup.
+
+The planned snapshot operation copies selected files. `removePath()` unselects
+a path; it does not record deletion from a committed snapshot. Persisting a
+deletion needs a separate agreed representation and issue before implementation.
+
 `getHistory()` follows HEAD and parent IDs from newest to oldest.
 `getCommitInfo(id)` returns one record, and `getCommittedFiles(id)` returns the
 snapshot's relative file paths. Missing or unreadable requested records must be
@@ -160,8 +182,11 @@ reported rather than treated as empty successful commits.
 an existing empty file. `FileState::classify()` receives working, staged and
 committed information plus `selected` (whether the root index lists this path).
 It performs no filesystem operations and may return multiple status strings, so
-staged content can also be modified again in the working tree. Agree on the
-exact status strings and classification tests in ST-2 before implementing it.
+staged content can also be modified again in the working tree. Use only these
+labels: `untracked`, `staged`, `modified`, `deleted`, and `unchanged`. Return
+`unchanged` only when no other label applies. A selected path with missing staged
+contents must report an error instead of inventing a status label. ST-2 defines
+the full classification matrix and tests before callers rely on those results.
 
 ## Build and review
 
