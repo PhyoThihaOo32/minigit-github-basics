@@ -77,14 +77,6 @@ bool checkPaths(const minigit::FileSystem& fileSystem, const fs::path& root)
         return false;
     }
 
-    // Longer than a filename component on POSIX or a complete Windows path.
-    const auto invalid = root / std::string(40000, 'x');
-    if (!checkFilesystemError([&] { fileSystem.fileStatus(invalid); },
-                              "an inspection failure must not be reported as a missing path"))
-    {
-        return false;
-    }
-
     const auto preserved = fileSystem.readTextFile(sentinel);
     return check(preserved.ok && preserved.text == "preserve me\n",
                  "failed operations must preserve the existing file");
@@ -110,15 +102,19 @@ bool checkLinks(const minigit::FileSystem& fileSystem, const fs::path& root)
 
     const auto directoryLink = root / "directory-link";
     const auto danglingLink = root / "dangling-link";
+    const auto loop = root / "loop";
     fs::create_directory_symlink(target.parent_path(), directoryLink);
     fs::create_symlink(root / "absent-target", danglingLink);
+    fs::create_directory_symlink(loop, loop);
 
     return check(fs::is_symlink(fileSystem.fileStatus(fileLink)),
                  "inspection must report the file link rather than its target")
         && check(fs::is_symlink(fileSystem.fileStatus(directoryLink)),
                  "inspection must report the directory link rather than its target")
         && check(fs::is_symlink(fileSystem.fileStatus(danglingLink)),
-                 "a dangling link must still be reported as a symbolic link");
+                 "a dangling link must still be reported as a symbolic link")
+        && checkFilesystemError([&] { fileSystem.fileStatus(loop / "child"); },
+                                "an unresolvable parent link must report an inspection error");
 }
 
 } // namespace
