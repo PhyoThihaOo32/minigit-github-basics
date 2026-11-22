@@ -1,0 +1,32 @@
+#pragma once
+
+#include <string>
+#include <vector>
+
+namespace minigit
+{
+
+// A missing file and an existing empty file must remain distinguishable.
+struct FileInfo
+{
+    bool exists = false;
+    std::string text;
+};
+
+// Compare supplied information without accessing the filesystem.
+class FileState
+{
+public:
+    FileState() = default;
+
+    // selected means the path is listed in the root index.txt. Multiple results
+    // allow staged content to differ again from the current working file.
+    // Labels are "untracked", "staged", "modified", "deleted", and "unchanged".
+    // A selected path without staged contents is an error, not an extra label.
+    std::vector<std::string> classify(const FileInfo& working,
+                                      const FileInfo& staged,
+                                      const FileInfo& committed,
+                                      bool selected) const;
+};
+
+} // namespace minigit

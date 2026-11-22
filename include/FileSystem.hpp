@@ -20,6 +20,13 @@ namespace minigit {
     public:
         FileSystem();
 
+        // M2 helpers: inspect without following the final symbolic link, and
+        // create missing directories. A missing path is a normal status result;
+        // other inspection errors and directory-creation failures throw.
+        // MG-1/MG-2 will provide the implementations.
+        std::filesystem::file_status fileStatus(const std::filesystem::path& path) const;
+        void createDirectories(const std::filesystem::path& path) const;
+
         // Read one index entry per line. Throw std::runtime_error if reading fails.
         std::vector<std::string> readIndex(std::filesystem::path& indexPath) const;
 
