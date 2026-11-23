@@ -131,13 +131,15 @@ void MiniGitManager::validateRepository() const
     requireDirectory(metadataRoot / "stage");
     requireDirectory(metadataRoot / "commits");
 
-    const std::string head = withoutFinalLineEnding(readMetadata(paths_.headFile()));
+    const std::string headText = readMetadata(paths_.headFile());
+    const std::string head = withoutFinalLineEnding(headText);
     (void)readMetadata(paths_.indexFile()); // must be a regular, readable file
 
     const fs::path nextIdFile = metadataRoot / "next-id.txt";
     const std::string nextId = withoutFinalLineEnding(readMetadata(nextIdFile));
 
-    if (!head.empty() && !isPositiveDecimalId(head))
+    // No commits means a zero-byte HEAD, not an empty line.
+    if (!headText.empty() && !isPositiveDecimalId(head))
     {
         throw damaged(paths_.headFile(), "must be empty or hold one positive commit ID");
     }

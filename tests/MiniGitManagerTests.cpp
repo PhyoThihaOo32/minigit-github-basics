@@ -332,7 +332,9 @@ bool checkDamaged(const fs::path& root, const std::string& name, Damage damage)
     const auto before = snapshot(projectRoot);
     std::string message;
     return check(initThrows(manager, message), "init must reject damaged metadata: " + name)
-        && check(!message.empty(), "the damaged-repository error must explain the problem")
+        && check(message.find("damaged MiniGit repository:") != std::string::npos
+                     && message.find(paths.metadataRoot().string()) != std::string::npos,
+                 "the damaged-repository error must describe and locate the problem")
         && check(snapshot(projectRoot) == before,
                  "init must not repair or remove damaged metadata: " + name);
 }
@@ -379,6 +381,14 @@ bool checkDamagedRepositories(const fs::path& root)
         && passed;
     passed = checkDamaged(root, "head-leading-zero", [&](const minigit::RepositoryPaths& p) {
                  return write(p.headFile(), "01");
+             })
+        && passed;
+    passed = checkDamaged(root, "head-only-lf", [&](const minigit::RepositoryPaths& p) {
+                 return write(p.headFile(), "\n");
+             })
+        && passed;
+    passed = checkDamaged(root, "head-only-crlf", [&](const minigit::RepositoryPaths& p) {
+                 return write(p.headFile(), "\r\n");
              })
         && passed;
     passed = checkDamaged(root, "next-id-zero", [&](const minigit::RepositoryPaths& p) {
@@ -446,6 +456,7 @@ int main()
     }
     catch (const std::exception& failure)
     {
+        passed = false;
         std::cerr << "MiniGitManager checks failed: " << failure.what() << '\n'; //wording updated
     }
 
