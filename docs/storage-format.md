@@ -1,6 +1,6 @@
 # MiniGit storage format
 
-This is the shared interface and storage proposal for HW12. Review it with the
+This is the shared interface and storage contract for HW12. Read it with the
 class headers before implementing the remaining classes. `MiniGitManager`,
 `init()` and `RepositoryPaths::metadataRoot()` are the names used by this team.
 
@@ -102,9 +102,11 @@ failures throw `std::filesystem::filesystem_error`. Existing filesystem methods
 keep their current result types and signatures.
 
 MG-1 (#56) implements the manager constructor and the agreed filesystem support;
-MG-2 (#60) implements initialization. The CLI and executable integration tests
-need their own M2 issues. This interface PR supplies declarations and compile
-checks, not those implementations.
+MG-2 (#60) implements initialization. CLI-1 (#63) adds `CommandLineApp::run()`,
+`main.cpp`, and the CMake `minigit` executable. Its registered dispatch tests call
+`run()` directly. The permanent executable integration suite remains separate M2
+work assigned to Martha; it must launch the actual executable as described below.
+The other future class headers still declare operations for later milestones.
 
 ## Selected paths and working files
 
@@ -204,8 +206,8 @@ the full classification matrix and tests before callers rely on those results.
 
 With `BUILD_TESTING` enabled, CMake compiles each remaining class header in its
 own translation unit through `interface_headers_check`. It does not instantiate
-future classes or link undefined method bodies. The existing six CTest suites
-must continue passing on macOS locally and Windows/Ubuntu CI.
+future classes or link undefined method bodies. All existing CTest suites must
+continue passing on macOS locally and Windows/Ubuntu CI.
 
 Runtime tests belong with each implementation. M2's final integration test must
 launch the real executable in owned temporary directories and check all five
