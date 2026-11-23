@@ -6,6 +6,19 @@ if(NOT DEFINED MINIGIT_EXE OR NOT EXISTS "${MINIGIT_EXE}")
     message(FATAL_ERROR "Could not find the minigit executable")
 endif()
 
+
+# Keep track of temporary folders created by these tests
+set(test_folders)
+
+# Clean up temporary folders before reporting a failure
+macro(fail_test error_message)
+    foreach(folder IN LISTS test_folders)
+        file(REMOVE_RECURSE "${folder}")
+    endforeach()
+    message(FATAL_ERROR "${error_message}")
+endmacro()
+
+
 # Create a unique temporary project folder
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef test_id)
 set(test_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-integration-${test_id}")
@@ -15,6 +28,7 @@ if(EXISTS "${test_folder}")
 endif()
 
 file(MAKE_DIRECTORY "${test_folder}")
+list(APPEND test_folders "${test_folder}")
 
 # Run the actual MiniGit executable
 execute_process(
@@ -86,19 +100,41 @@ endforeach()
 
 # Test 2: Repeated initialization
 
+# Create a separate folder for Test 2
+string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef repeat_id)
+set(repeat_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-repeat-${repeat_id}")
+file(MAKE_DIRECTORY "${repeat_folder}")
+list(APPEND test_folders "${repeat_folder}")
+
+set(repeat_meta "${repeat_folder}/.minigit")
+
+# Initialize this repository before testing repeated init
+execute_process(
+    COMMAND "${MINIGIT_EXE}" init
+    WORKING_DIRECTORY "${repeat_folder}"
+    RESULT_VARIABLE setup_result
+    OUTPUT_VARIABLE setup_output
+    ERROR_VARIABLE setup_error
+)
+
+if(NOT "${setup_result}" STREQUAL "0")
+    fail_test("Test 2 setup failed: ${setup_error}")
+endif()
+
+
 # Create a file to check that existing data is preserved
-set(sentinel "${meta}/keep.txt")
+set(sentinel "${repeat_meta}/keep.txt")
 file(WRITE "${sentinel}" "keep this data")
 
 # Save original metadata before running init again
-file(READ "${meta}/HEAD" original_head)
-file(READ "${meta}/index.txt" original_index)
-file(READ "${meta}/next-id.txt" original_next_id)
+file(READ "${repeat_meta}/HEAD" original_head)
+file(READ "${repeat_meta}/index.txt" original_index)
+file(READ "${repeat_meta}/next-id.txt" original_next_id)
 
 # Run minigit init for the second time
 execute_process(
     COMMAND "${MINIGIT_EXE}" init
-    WORKING_DIRECTORY "${test_folder}"
+    WORKING_DIRECTORY "${repeat_folder}"
     RESULT_VARIABLE second_result
     OUTPUT_VARIABLE second_output
     ERROR_VARIABLE second_error
@@ -107,11 +143,8 @@ execute_process(
 # Check that the second init succeeds
 
 if(NOT "${second_result}" STREQUAL "0")
-    message(FATAL_ERROR
-        "Test 2 failed: repeated init should return 0\n"
-        "Actual result: ${second_result}\n"
-        "stdout: ${second_output}\n"
-        "stderr: ${second_error}"
+    fail_test(
+        "Test 2 failed: repeated init should return 0\nActual result: ${second_result}\nstdout: ${second_output}\nstderr: ${second_error}"
     )
 endif()
 
@@ -139,9 +172,9 @@ endif()
 
 
 # Verify metadata was preserved
-file(READ "${meta}/HEAD" current_head)
-file(READ "${meta}/index.txt" current_index)
-file(READ "${meta}/next-id.txt" current_next_id)
+file(READ "${repeat_meta}/HEAD" current_head)
+file(READ "${repeat_meta}/index.txt" current_index)
+file(READ "${repeat_meta}/next-id.txt" current_next_id)
 
 if(NOT "${current_head}" STREQUAL "${original_head}")
     message(FATAL_ERROR "Test 2 failed: HEAD was modified")
@@ -157,17 +190,47 @@ endif()
 
 
 message(STATUS "Test 2 passed: repeated initialization")
+# Remove only Test 2's temporary repository
+file(REMOVE_RECURSE "${repeat_folder}")
 
 
 # Test 3: Damaged repository (missing HEAD)
 
+# Create a separate folder for Test 3
+string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef damaged_id)
+set(damaged_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-damaged-${damaged_id}")
+file(MAKE_DIRECTORY "${damaged_folder}")
+list(APPEND test_folders "${damaged_folder}")
+
+set(damaged_meta "${damaged_folder}/.minigit")
+
+# Initialize the repository first
+execute_process(
+    COMMAND "${MINIGIT_EXE}" init
+    WORKING_DIRECTORY "${damaged_folder}"
+    RESULT_VARIABLE damaged_setup_result
+    ERROR_VARIABLE damaged_setup_error
+)
+
+if(NOT "${damaged_setup_result}" STREQUAL "0")
+    fail_test("Test 3 setup failed: ${damaged_setup_error}")
+endif()
+
+# Add a file to check whether existing data is preserved
+set(damaged_sentinel "${damaged_meta}/keep.txt")
+file(WRITE "${damaged_sentinel}" "keep this data")
+
+# Save existing metadata before damaging the repository
+file(READ "${damaged_meta}/index.txt" original_damaged_index)
+file(READ "${damaged_meta}/next-id.txt" original_damaged_id)
+
 # Remove HEAD to simulate damaged metadata
-file(REMOVE "${meta}/HEAD")
+file(REMOVE "${damaged_meta}/HEAD")
 
 # Run init on the damaged repository
 execute_process(
     COMMAND "${MINIGIT_EXE}" init
-    WORKING_DIRECTORY "${test_folder}"
+    WORKING_DIRECTORY "${damaged_folder}"
     RESULT_VARIABLE damaged_result
     OUTPUT_VARIABLE damaged_output
     ERROR_VARIABLE damaged_error
@@ -175,7 +238,7 @@ execute_process(
 
 # The command must fail
 if(NOT "${damaged_result}" STREQUAL "1")
-    message(FATAL_ERROR "Test 3 failed: damaged repository should return 1")
+    fail_test("Test 3 failed: damaged repository should return 1")
 endif()
 
 # The error must begin with Error:
@@ -189,19 +252,46 @@ if(NOT damaged_output STREQUAL "")
 endif()
 
 # init must not repair HEAD automatically
-if(EXISTS "${meta}/HEAD")
+if(EXISTS "${damaged_meta}/HEAD")
     message(FATAL_ERROR "Test 3 failed: missing HEAD should not be recreated")
 endif()
 
 # Verify that our existing sentinel was preserved
-file(READ "${sentinel}" sentinel_after_damage)
+file(READ "${damaged_sentinel}" sentinel_after_damage)
 
 if(NOT sentinel_after_damage STREQUAL "keep this data")
     message(FATAL_ERROR "Test 3 failed: existing data was modified")
 endif()
 
-message(STATUS "Test 3 passed: damaged repository rejected")
 
+# Verify existing metadata still exists
+foreach(filename IN ITEMS index.txt next-id.txt)
+    if(NOT EXISTS "${damaged_meta}/${filename}")
+        fail_test("Test 3 failed: ${filename} was deleted")
+    endif()
+endforeach()
+
+# Compare metadata before and after the failed init
+file(READ "${damaged_meta}/index.txt" current_damaged_index)
+file(READ "${damaged_meta}/next-id.txt" current_damaged_id)
+
+if(NOT "${current_damaged_index}" STREQUAL "${original_damaged_index}")
+    fail_test("Test 3 failed: index.txt was modified")
+endif()
+
+if(NOT "${current_damaged_id}" STREQUAL "${original_damaged_id}")
+    fail_test("Test 3 failed: next-id.txt was modified")
+endif()
+
+# Verify the existing directories were preserved
+if(NOT IS_DIRECTORY "${damaged_meta}/stage"
+   OR NOT IS_DIRECTORY "${damaged_meta}/commits")
+    fail_test("Test 3 failed: repository directories were removed")
+endif()
+
+
+message(STATUS "Test 3 passed: damaged repository rejected")
+file(REMOVE_RECURSE "${damaged_folder}")
 
 # Test 4: Invalid and unsupported commands
 
@@ -246,6 +336,7 @@ foreach(args IN ITEMS "status" "unknown" "init extra" "")
     endif()
 
     file(REMOVE_RECURSE "${case_folder}")
+    list(APPEND test_folders "${case_folder}")
 endforeach()
 
 message(STATUS "Test 4 passed: invalid commands rejected")
@@ -257,6 +348,7 @@ message(STATUS "Test 4 passed: invalid commands rejected")
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef file_case_id)
 set(file_case_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-file-${file_case_id}")
 file(MAKE_DIRECTORY "${file_case_folder}")
+list(APPEND test_folders "${file_case_folder}")
 
 # Create .minigit as a file, not a directory
 set(metadata_file "${file_case_folder}/.minigit")
