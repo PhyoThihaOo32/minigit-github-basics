@@ -31,6 +31,13 @@ public:
     void status() const;
 
 private:
+    //M2: Initializing Repository
+    void createRepository() const;
+    void writeMetadata(const std::filesystem::path& path, const std::string& text) const;
+    void validateRepository() const;
+    void requireDirectory(const std::filesystem::path& path) const;
+    std::string readMetadata(const std::filesystem::path& path) const;
+
     const RepositoryPaths& paths_;
     const FileSystem& fileSystem_;
 };
