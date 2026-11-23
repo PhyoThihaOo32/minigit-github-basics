@@ -9,8 +9,12 @@ add_library(minigit_paths src/PathLab.cpp src/RepositoryPaths.cpp src/FileSystem
 target_sources(minigit_paths PRIVATE
     src/ReadIndex.cpp
     src/MiniGitManager.cpp
-    src/FileSystemPaths.cpp)
+    src/FileSystemPaths.cpp
+    src/CommandLineApp.cpp)
 target_include_directories(minigit_paths PUBLIC include)
+
+add_executable(minigit src/main.cpp)
+target_link_libraries(minigit PRIVATE minigit_paths)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -59,4 +63,8 @@ if(BUILD_TESTING)
     target_link_libraries(filesystem_paths_tests PRIVATE minigit_paths)
     target_include_directories(filesystem_paths_tests PRIVATE src)
     add_test(NAME filesystem_paths_tests COMMAND filesystem_paths_tests)
+
+    add_executable(command_line_app_tests tests/CommandLineAppTests.cpp)
+    target_link_libraries(command_line_app_tests PRIVATE minigit_paths)
+    add_test(NAME command_line_app_tests COMMAND command_line_app_tests)
 endif()
