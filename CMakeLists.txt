@@ -72,6 +72,9 @@ if(BUILD_TESTING)
         NAME minigit_init_integration
         COMMAND ${CMAKE_COMMAND}
             "-DMINIGIT_EXE=$<TARGET_FILE:minigit>"
+            "-DTEST_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/MinigitInitIntegration.cmake"
     )
+
+    set_tests_properties(minigit_init_integration PROPERTIES TIMEOUT 60)
 endif()

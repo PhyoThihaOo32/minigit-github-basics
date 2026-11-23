@@ -5,7 +5,9 @@
 if(NOT DEFINED MINIGIT_EXE OR NOT EXISTS "${MINIGIT_EXE}")
     message(FATAL_ERROR "Could not find the minigit executable")
 endif()
-
+if(NOT DEFINED TEST_BUILD_DIR OR NOT IS_DIRECTORY "${TEST_BUILD_DIR}")
+    message(FATAL_ERROR "Invalid test build directory")
+endif()
 
 # Keep track of temporary folders created by these tests
 set(test_folders)
@@ -21,7 +23,7 @@ endmacro()
 
 # Create a unique temporary project folder
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef test_id)
-set(test_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-integration-${test_id}")
+set(test_folder "${TEST_BUILD_DIR}/minigit-integration-${test_id}")
 
 if(EXISTS "${test_folder}")
     message(FATAL_ERROR "Temporary folder already exists")
@@ -54,22 +56,49 @@ if(NOT error_output STREQUAL "")
     fail_test("Test 1 failed: unexpected error output")
 endif()
 
-# Check the required directories
 set(meta "${test_folder}/.minigit")
+# Check that the project root contains only .minigit
+file(GLOB root_entries RELATIVE "${test_folder}"
+    "${test_folder}/*"
+    "${test_folder}/.*"
+)
+list(REMOVE_ITEM root_entries "." "..")
+list(SORT root_entries)
+
+if(NOT "${root_entries}" STREQUAL ".minigit")
+    fail_test("Test 1 failed: unexpected files at project root: ${root_entries}")
+endif()
+
+# Check the exact contents of .minigit
+file(GLOB metadata_entries RELATIVE "${meta}"
+    "${meta}/*"
+    "${meta}/.*"
+)
+list(REMOVE_ITEM metadata_entries "." "..")
+list(SORT metadata_entries)
+
+set(expected_entries "HEAD;commits;index.txt;next-id.txt;stage")
+
+if(NOT "${metadata_entries}" STREQUAL "${expected_entries}")
+    fail_test("Test 1 failed: unexpected metadata layout: ${metadata_entries}")
+endif()
+
+
+# Check the required directories
 
 foreach(folder IN ITEMS
     "${meta}"
     "${meta}/stage"
     "${meta}/commits"
 )
-    if(NOT IS_DIRECTORY "${folder}")
+    if(NOT IS_DIRECTORY "${folder}" OR IS_SYMLINK "${folder}")
         fail_test("Test 1 failed: missing directory ${folder}")
     endif()
 endforeach()
 
 # Check the required files
 foreach(filename IN ITEMS HEAD index.txt next-id.txt)
-    if(NOT EXISTS "${meta}/${filename}" OR IS_DIRECTORY "${meta}/${filename}")
+    if(NOT EXISTS "${meta}/${filename}" OR IS_DIRECTORY "${meta}/${filename}" OR IS_SYMLINK "${meta}/${filename}")
         fail_test("Test 1 failed: missing file ${filename}")
     endif()
 endforeach()
@@ -91,7 +120,16 @@ endif()
 
 # stage and commits must be empty
 foreach(folder IN ITEMS stage commits)
-    file(GLOB contents "${meta}/${folder}/*")
+    file(GLOB contents
+        "${meta}/${folder}/*"
+        "${meta}/${folder}/.*"
+    )
+
+    list(REMOVE_ITEM contents
+        "${meta}/${folder}/."
+        "${meta}/${folder}/.."
+    )
+
     if(contents)
         fail_test("Test 1 failed: ${folder} should be empty")
     endif()
@@ -106,7 +144,7 @@ message(STATUS "Test 1 passed: fresh initialization")
 
 # Create a separate folder for Test 2
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef repeat_id)
-set(repeat_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-repeat-${repeat_id}")
+set(repeat_folder "${TEST_BUILD_DIR}/minigit-repeat-${repeat_id}")
 file(MAKE_DIRECTORY "${repeat_folder}")
 list(APPEND test_folders "${repeat_folder}")
 
@@ -129,6 +167,20 @@ endif()
 # Create a file to check that existing data is preserved
 set(sentinel "${repeat_meta}/keep.txt")
 file(WRITE "${sentinel}" "keep this data")
+
+
+# Simulate a repository with existing metadata and files
+file(WRITE "${repeat_meta}/HEAD" "5\n")
+file(WRITE "${repeat_meta}/index.txt" "notes.txt\n")
+file(WRITE "${repeat_meta}/next-id.txt" "6\n")
+
+file(WRITE "${repeat_meta}/stage/notes.txt" "staged notes")
+file(MAKE_DIRECTORY "${repeat_meta}/commits/5")
+file(WRITE "${repeat_meta}/commits/5/message.txt" "previous commit")
+
+# Save existing file contents
+file(READ "${repeat_meta}/stage/notes.txt" original_stage)
+file(READ "${repeat_meta}/commits/5/message.txt" original_commit)
 
 # Save original metadata before running init again
 file(READ "${repeat_meta}/HEAD" original_head)
@@ -202,6 +254,28 @@ if(NOT "${current_next_id}" STREQUAL "${original_next_id}")
 endif()
 
 
+# Verify staged and committed files were preserved
+foreach(path IN ITEMS
+    "${repeat_meta}/stage/notes.txt"
+    "${repeat_meta}/commits/5/message.txt"
+)
+    if(NOT EXISTS "${path}" OR IS_DIRECTORY "${path}")
+        fail_test("Test 2 failed: existing file missing: ${path}")
+    endif()
+endforeach()
+
+file(READ "${repeat_meta}/stage/notes.txt" current_stage)
+file(READ "${repeat_meta}/commits/5/message.txt" current_commit)
+
+if(NOT "${current_stage}" STREQUAL "${original_stage}")
+    fail_test("Test 2 failed: staged file was modified")
+endif()
+
+if(NOT "${current_commit}" STREQUAL "${original_commit}")
+    fail_test("Test 2 failed: committed file was modified")
+endif()
+
+
 message(STATUS "Test 2 passed: repeated initialization")
 # Remove only Test 2's temporary repository
 file(REMOVE_RECURSE "${repeat_folder}")
@@ -211,7 +285,7 @@ file(REMOVE_RECURSE "${repeat_folder}")
 
 # Create a separate folder for Test 3
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef damaged_id)
-set(damaged_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-damaged-${damaged_id}")
+set(damaged_folder "${TEST_BUILD_DIR}/minigit-damaged-${damaged_id}")
 file(MAKE_DIRECTORY "${damaged_folder}")
 list(APPEND test_folders "${damaged_folder}")
 
@@ -232,6 +306,21 @@ endif()
 # Add a file to check whether existing data is preserved
 set(damaged_sentinel "${damaged_meta}/keep.txt")
 file(WRITE "${damaged_sentinel}" "keep this data")
+
+
+# Prepare meaningful existing metadata
+file(WRITE "${damaged_meta}/HEAD" "5\n")
+file(WRITE "${damaged_meta}/index.txt" "notes.txt\n")
+file(WRITE "${damaged_meta}/next-id.txt" "6\n")
+
+file(WRITE "${damaged_meta}/stage/notes.txt" "staged notes")
+file(MAKE_DIRECTORY "${damaged_meta}/commits/5")
+file(WRITE "${damaged_meta}/commits/5/message.txt" "previous commit")
+
+# Save staged and committed data before the failure
+file(READ "${damaged_meta}/stage/notes.txt" original_damaged_stage)
+file(READ "${damaged_meta}/commits/5/message.txt" original_damaged_commit)
+
 
 # Save existing metadata before damaging the repository
 file(READ "${damaged_meta}/index.txt" original_damaged_index)
@@ -310,6 +399,28 @@ if(NOT IS_DIRECTORY "${damaged_meta}/stage"
 endif()
 
 
+# Existing staged and committed files must survive the failure
+foreach(path IN ITEMS
+    "${damaged_meta}/stage/notes.txt"
+    "${damaged_meta}/commits/5/message.txt"
+)
+    if(NOT EXISTS "${path}" OR IS_DIRECTORY "${path}")
+        fail_test("Test 3 failed: existing file missing: ${path}")
+    endif()
+endforeach()
+
+file(READ "${damaged_meta}/stage/notes.txt" current_damaged_stage)
+file(READ "${damaged_meta}/commits/5/message.txt" current_damaged_commit)
+
+if(NOT "${current_damaged_stage}" STREQUAL "${original_damaged_stage}")
+    fail_test("Test 3 failed: staged file was modified")
+endif()
+
+if(NOT "${current_damaged_commit}" STREQUAL "${original_damaged_commit}")
+    fail_test("Test 3 failed: committed file was modified")
+endif()
+
+
 message(STATUS "Test 3 passed: damaged repository rejected")
 file(REMOVE_RECURSE "${damaged_folder}")
 
@@ -319,7 +430,7 @@ foreach(args IN ITEMS "status" "unknown" "init extra" "")
 
     # Create a separate temporary folder for each command
     string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef case_id)
-    set(case_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-invalid-${case_id}")
+    set(case_folder "${TEST_BUILD_DIR}/minigit-invalid-${case_id}")
     file(MAKE_DIRECTORY "${case_folder}")
     list(APPEND test_folders "${case_folder}")
 
@@ -367,7 +478,7 @@ message(STATUS "Test 4 passed: invalid commands rejected")
 
 # Create a separate folder for this test
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef file_case_id)
-set(file_case_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-file-${file_case_id}")
+set(file_case_folder "${TEST_BUILD_DIR}/minigit-file-${file_case_id}")
 file(MAKE_DIRECTORY "${file_case_folder}")
 list(APPEND test_folders "${file_case_folder}")
 
