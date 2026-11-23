@@ -29,6 +29,19 @@ See [`docs/tutorial.md`](docs/tutorial.md) for the end-to-end walkthrough. Suppo
 The remaining class headers describe the proposed command and storage interfaces.
 See [`docs/storage-format.md`](docs/storage-format.md) for the disk layout, init
 validation rules, and M2 call chain. These headers declare future operations;
-their implementations and the runnable `minigit` command are separate tasks.
+the later commands are not implemented yet. M2 now supports `minigit init`.
 With testing enabled, the build compiles each new header independently as well
 as building the existing CTest programs.
+
+After building, run the executable from the project folder you want to initialize.
+For macOS/Linux, use the absolute path to `build/minigit`; for a Windows Release
+build, use the absolute path to `build/Release/minigit.exe`.
+
+```sh
+/absolute/path/to/minigit-github-basics/build/minigit init
+```
+
+The first run creates the documented `.minigit` layout. A second run reports
+that the repository is already initialized and preserves its contents. Damaged
+metadata, missing commands, unknown commands, and extra arguments print
+`Error: ...` to standard error and return exit code `1`. Success returns `0`.
