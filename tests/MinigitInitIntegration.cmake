@@ -41,17 +41,17 @@ execute_process(
 
 # Check the exit code
 if(NOT "${result}" STREQUAL "0")
-    message(FATAL_ERROR "Test 1 failed: init should return 0. ${error_output}")
+    fail_test("Test 1 failed: init should return 0. ${error_output}")
 endif()
 
 # Check that init printed the success message
 if(NOT output MATCHES "Initialized empty MiniGit repository")
-    message(FATAL_ERROR "Test 1 failed: missing success message")
+    fail_test("Test 1 failed: missing success message")
 endif()
 
 # Check that there are no errors
 if(NOT error_output STREQUAL "")
-    message(FATAL_ERROR "Test 1 failed: unexpected error output")
+    fail_test("Test 1 failed: unexpected error output")
 endif()
 
 # Check the required directories
@@ -63,14 +63,14 @@ foreach(folder IN ITEMS
     "${meta}/commits"
 )
     if(NOT IS_DIRECTORY "${folder}")
-        message(FATAL_ERROR "Test 1 failed: missing directory ${folder}")
+        fail_test("Test 1 failed: missing directory ${folder}")
     endif()
 endforeach()
 
 # Check the required files
 foreach(filename IN ITEMS HEAD index.txt next-id.txt)
     if(NOT EXISTS "${meta}/${filename}" OR IS_DIRECTORY "${meta}/${filename}")
-        message(FATAL_ERROR "Test 1 failed: missing file ${filename}")
+        fail_test("Test 1 failed: missing file ${filename}")
     endif()
 endforeach()
 
@@ -79,26 +79,30 @@ file(SIZE "${meta}/HEAD" head_size)
 file(SIZE "${meta}/index.txt" index_size)
 
 if(NOT head_size EQUAL 0 OR NOT index_size EQUAL 0)
-    message(FATAL_ERROR "Test 1 failed: HEAD and index.txt must be empty")
+    fail_test("Test 1 failed: HEAD and index.txt must be empty")
 endif()
 
 # The first available commit ID must be 1
 file(READ "${meta}/next-id.txt" next_id)
 
 if(NOT next_id STREQUAL "1\n")
-    message(FATAL_ERROR "Test 1 failed: next-id.txt should contain 1 followed by a newline")
+    fail_test("Test 1 failed: next-id.txt should contain 1 followed by a newline")
 endif()
 
 # stage and commits must be empty
 foreach(folder IN ITEMS stage commits)
     file(GLOB contents "${meta}/${folder}/*")
     if(contents)
-        message(FATAL_ERROR "Test 1 failed: ${folder} should be empty")
+        fail_test("Test 1 failed: ${folder} should be empty")
     endif()
 endforeach()
 
 
 # Test 2: Repeated initialization
+# Clean up only our test folder
+file(REMOVE_RECURSE "${test_folder}")
+
+message(STATUS "Test 1 passed: fresh initialization")
 
 # Create a separate folder for Test 2
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef repeat_id)
@@ -151,24 +155,33 @@ endif()
 
 # Check the message
 if(NOT second_output MATCHES "already initialized")
-    message(FATAL_ERROR "Test 2 failed: missing already initialized message")
+    fail_test("Test 2 failed: missing already initialized message")
 endif()
 
 # Check there are no errors
 if(NOT second_error STREQUAL "")
-    message(FATAL_ERROR "Test 2 failed: unexpected error output")
+    fail_test("Test 2 failed: unexpected error output")
 endif()
 
 # Check that existing data was not overwritten or deleted
 if(NOT EXISTS "${sentinel}")
-    message(FATAL_ERROR "Test 2 failed: existing file was deleted")
+    fail_test("Test 2 failed: existing file was deleted")
 endif()
 
 file(READ "${sentinel}" sentinel_content)
 
 if(NOT sentinel_content STREQUAL "keep this data")
-    message(FATAL_ERROR "Test 2 failed: existing file was modified")
+    fail_test("Test 2 failed: existing file was modified")
 endif()
+
+
+# Verify files exist before reading
+foreach(filename IN ITEMS HEAD index.txt next-id.txt)
+    if(NOT EXISTS "${repeat_meta}/${filename}"
+       OR IS_DIRECTORY "${repeat_meta}/${filename}")
+        fail_test("Test 2 failed: ${filename} is missing")
+    endif()
+endforeach()
 
 
 # Verify metadata was preserved
@@ -177,15 +190,15 @@ file(READ "${repeat_meta}/index.txt" current_index)
 file(READ "${repeat_meta}/next-id.txt" current_next_id)
 
 if(NOT "${current_head}" STREQUAL "${original_head}")
-    message(FATAL_ERROR "Test 2 failed: HEAD was modified")
+    fail_test("Test 2 failed: HEAD was modified")
 endif()
 
 if(NOT "${current_index}" STREQUAL "${original_index}")
-    message(FATAL_ERROR "Test 2 failed: index.txt was modified")
+    fail_test("Test 2 failed: index.txt was modified")
 endif()
 
 if(NOT "${current_next_id}" STREQUAL "${original_next_id}")
-    message(FATAL_ERROR "Test 2 failed: next-id.txt was modified")
+    fail_test("Test 2 failed: next-id.txt was modified")
 endif()
 
 
@@ -243,31 +256,38 @@ endif()
 
 # The error must begin with Error:
 if(NOT damaged_error MATCHES "^Error:")
-    message(FATAL_ERROR "Test 3 failed: expected Error: on stderr")
+    fail_test("Test 3 failed: expected Error: on stderr")
 endif()
 
 # It must not print a success message
 if(NOT damaged_output STREQUAL "")
-    message(FATAL_ERROR "Test 3 failed: damaged init should not print success")
+    fail_test("Test 3 failed: damaged init should not print success")
 endif()
 
 # init must not repair HEAD automatically
 if(EXISTS "${damaged_meta}/HEAD")
-    message(FATAL_ERROR "Test 3 failed: missing HEAD should not be recreated")
+    fail_test("Test 3 failed: missing HEAD should not be recreated")
 endif()
 
+
 # Verify that our existing sentinel was preserved
+if(NOT EXISTS "${damaged_sentinel}"
+   OR IS_DIRECTORY "${damaged_sentinel}")
+    fail_test("Test 3 failed: sentinel file is missing")
+endif()
+
 file(READ "${damaged_sentinel}" sentinel_after_damage)
 
+
 if(NOT sentinel_after_damage STREQUAL "keep this data")
-    message(FATAL_ERROR "Test 3 failed: existing data was modified")
+    fail_test("Test 3 failed: existing data was modified")
 endif()
 
 
 # Verify existing metadata still exists
 foreach(filename IN ITEMS index.txt next-id.txt)
-    if(NOT EXISTS "${damaged_meta}/${filename}")
-        fail_test("Test 3 failed: ${filename} was deleted")
+    if(NOT EXISTS "${damaged_meta}/${filename}" OR IS_DIRECTORY "${damaged_meta}/${filename}")
+        fail_test("Test 3 failed: ${filename} is missing")
     endif()
 endforeach()
 
@@ -301,6 +321,8 @@ foreach(args IN ITEMS "status" "unknown" "init extra" "")
     string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef case_id)
     set(case_folder "${CMAKE_CURRENT_BINARY_DIR}/minigit-invalid-${case_id}")
     file(MAKE_DIRECTORY "${case_folder}")
+    list(APPEND test_folders "${case_folder}")
+
 
     # Convert the argument string into a list
     if(args STREQUAL "")
@@ -319,24 +341,23 @@ foreach(args IN ITEMS "status" "unknown" "init extra" "")
     )
 
     if(NOT "${invalid_result}" STREQUAL "1")
-        message(FATAL_ERROR "Test 4 failed: '${args}' should return 1")
+        fail_test("Test 4 failed: '${args}' should return 1")
     endif()
 
     if(NOT invalid_error MATCHES "^Error:")
-        message(FATAL_ERROR "Test 4 failed: '${args}' should print Error: on stderr")
+        fail_test("Test 4 failed: '${args}' should print Error: on stderr")
     endif()
 
     if(NOT invalid_output STREQUAL "")
-        message(FATAL_ERROR "Test 4 failed: '${args}' should not print success")
+        fail_test("Test 4 failed: '${args}' should not print success")
     endif()
 
     # An invalid command should not create repository metadata
     if(EXISTS "${case_folder}/.minigit")
-        message(FATAL_ERROR "Test 4 failed: '${args}' created metadata")
+        fail_test("Test 4 failed: '${args}' created metadata")
     endif()
 
     file(REMOVE_RECURSE "${case_folder}")
-    list(APPEND test_folders "${case_folder}")
 endforeach()
 
 message(STATUS "Test 4 passed: invalid commands rejected")
@@ -365,29 +386,29 @@ execute_process(
 
 # The command must fail
 if(NOT "${file_result}" STREQUAL "1")
-    message(FATAL_ERROR "Test 5 failed: .minigit as a file should return 1")
+    fail_test("Test 5 failed: .minigit as a file should return 1")
 endif()
 
 # Check for the error message
 if(NOT file_error MATCHES "^Error:")
-    message(FATAL_ERROR "Test 5 failed: expected Error: on stderr")
+    fail_test("Test 5 failed: expected Error: on stderr")
 endif()
 
 # No success message should be printed
 if(NOT file_output STREQUAL "")
-    message(FATAL_ERROR "Test 5 failed: unexpected success output")
+    fail_test("Test 5 failed: unexpected success output")
 endif()
 
 # .minigit must still be a regular file
 if(IS_DIRECTORY "${metadata_file}" OR NOT EXISTS "${metadata_file}")
-    message(FATAL_ERROR "Test 5 failed: original .minigit file was replaced")
+    fail_test("Test 5 failed: original .minigit file was replaced")
 endif()
 
 # Check the original contents were preserved
 file(READ "${metadata_file}" file_content)
 
 if(NOT file_content STREQUAL "important existing data")
-    message(FATAL_ERROR "Test 5 failed: original .minigit file was modified")
+    fail_test("Test 5 failed: original .minigit file was modified")
 endif()
 
 # Clean up this test's folder
@@ -396,7 +417,4 @@ file(REMOVE_RECURSE "${file_case_folder}")
 message(STATUS "Test 5 passed: .minigit regular file preserved")
 
 
-# Clean up only our test folder
-file(REMOVE_RECURSE "${test_folder}")
 
-message(STATUS "Test 1 passed: fresh initialization")
