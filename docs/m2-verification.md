@@ -30,12 +30,14 @@ cd /path/to/a/separate/project-folder
 /absolute/path/to/minigit-github-basics/build/minigit init
 ```
 
-Windows PowerShell, with a Release build:
+Windows PowerShell, using the Visual Studio 2022 generator and Release configuration:
 
 ```powershell
 Set-Location C:\path\to\a\separate\project-folder
 & 'C:\absolute\path\to\minigit-github-basics\build\Release\minigit.exe' init
 ```
+
+With a single-configuration generator such as Ninja, the Windows executable is `build/minigit.exe`, without the `Release/` directory. For those generators, select Release when configuring with `-DCMAKE_BUILD_TYPE=Release`.
 
 For repeat initialization, run the same command again from that same project folder. Keep verification project folders outside the repository and remove only folders created for the verification.
 
